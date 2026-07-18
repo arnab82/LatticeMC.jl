@@ -10,7 +10,7 @@ apply_one_body_ab_initio!(phi::Matrix{ComplexF64}, expH1_half::Matrix{Float64}) 
 #
 # Deliberately unbiased: x is sampled directly from N(0, I), not shifted
 # toward a mean field. See propagate_step_ab_initio_force_bias! below for
-# the variance-reduced alternative, and docs/afqmc_ab_initio_theory.md
+# the variance-reduced alternative, and docs/src/afqmc_ab_initio_theory.md
 # section 7.1 for why force bias helps variance but not the phaseless
 # approximation's own asymptotic bias (measured, not assumed). Correctness
 # here is carried entirely by the phaseless gate below (the complex

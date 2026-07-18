@@ -3,6 +3,8 @@
 ==============================
 
 [![CI](https://github.com/arnab82/LatticeMC.jl/actions/workflows/blank.yml/badge.svg)](https://github.com/arnab82/LatticeMC.jl/actions/workflows/blank.yml)
+[![Docs](https://github.com/arnab82/LatticeMC.jl/actions/workflows/documentation.yml/badge.svg)](https://github.com/arnab82/LatticeMC.jl/actions/workflows/documentation.yml)
+[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://arnab82.github.io/LatticeMC.jl/)
 
 
 ## Overview
@@ -30,7 +32,7 @@ All three re-export their public API at the top level, so
 `LatticeMC.IsingModel(...)`, `LatticeMC.run_afqmc(...)`, and
 `LatticeMC.run_afqmc_ab_initio(...)` all work directly.
 
-**New here?** Start with [`docs/tutorial.md`](docs/tutorial.md) -- a
+**New here?** Start with [`docs/src/tutorial.md`](docs/src/tutorial.md) -- a
 hands-on walkthrough of all three methods -- rather than this README.
 
 ## Features
@@ -51,8 +53,8 @@ hands-on walkthrough of all three methods -- rather than this README.
 - Rank-1 (Sherman-Morrison) Green's-function updates for the auxiliary-field
   sweep, the same fast-update trick used in production DQMC/CPMC codes:
   O(1) per candidate field and O(N^2) per accepted site update, instead of an
-  O(N^3) determinant recompute -- see `docs/afqmc_theory.md` and
-  `docs/afqmc_implementation.md` for the full derivation and where it lives
+  O(N^3) determinant recompute -- see `docs/src/afqmc_theory.md` and
+  `docs/src/afqmc_implementation.md` for the full derivation and where it lives
   in the code.
 - A second trial wavefunction, `build_uhf_trial`, self-consistent unrestricted
   Hartree-Fock with an antiferromagnetic (Neel) seed -- a drop-in alternative
@@ -62,7 +64,7 @@ hands-on walkthrough of all three methods -- rather than this README.
 
 Known, standard AFQMC approximations: constrained-path bias, population-control
 bias, and finite-`dtau` Trotter error -- not implementation bugs, see
-`docs/afqmc_theory.md`. Overall cost is O(Ns^3) per full propagation step
+`docs/src/afqmc_theory.md`. Overall cost is O(Ns^3) per full propagation step
 (dominated by the two dense K/2 half-steps and the one Green's-function
 recompute per step), which is practical up to roughly Ns ~ 30-50 sites for a
 full production run (hundreds of walkers, thousands of steps) in well under a
@@ -106,34 +108,38 @@ mean-field* (RHF's own dissociation-catastrophe instability poisoning the
 trial) while the UHF trial recovers ~75%, a real fix for that different
 failure mode. H2, which stays single-reference throughout, recovers ~93%
 with just the RHF trial. See
-[`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) sections
+[`docs/src/afqmc_ab_initio_theory.md`](docs/src/afqmc_ab_initio_theory.md) sections
 6-7 for the full account (including the cross-validation that ruled out a
 bug) before drawing conclusions on a new system.
 
 ## Documentation
 
-- [`docs/afqmc_theory.md`](docs/afqmc_theory.md) -- step-by-step derivation of
+Rendered and searchable at **<https://arnab82.github.io/LatticeMC.jl/>**
+(built from `docs/src/` by Documenter.jl on every push to `master`). The
+source pages:
+
+- [`docs/src/afqmc_theory.md`](docs/src/afqmc_theory.md) -- step-by-step derivation of
   the AFQMC algorithm implemented here: the Hubbard Hamiltonian, symmetric
   Trotter splitting, the discrete Hirsch Hubbard-Stratonovich transform,
   importance sampling from a trial wavefunction, the constrained-path
   approximation, population control, the mixed-estimator energy, and the
   rank-1 Green's-function fast-update formulas.
-- [`docs/afqmc_implementation.md`](docs/afqmc_implementation.md) -- maps each
+- [`docs/src/afqmc_implementation.md`](docs/src/afqmc_implementation.md) -- maps each
   piece of that theory to the actual code (file by file, function by
   function), for when you're reading or modifying `src/afqmc/`.
-- [`docs/afqmc_algorithm.md`](docs/afqmc_algorithm.md) -- formal, paper-style
+- [`docs/src/afqmc_algorithm.md`](docs/src/afqmc_algorithm.md) -- formal, paper-style
   pseudocode for the outer population loop, the per-walker Trotter step
   (including the rank-1-update inner loop), and population control, each
   cross-referenced to the theory section and the implementing function.
-- [`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) --
+- [`docs/src/afqmc_ab_initio_theory.md`](docs/src/afqmc_ab_initio_theory.md) --
   addendum for the ab initio case: the general Hamiltonian, orbital
   orthonormality, the Cholesky decomposition and its one-body exchange
   correction, the continuous Hubbard-Stratonovich transform, the complex
   phaseless gate, and the measured trial-quality dependence (section 6).
-- [`docs/afqmc_implementation.md`](docs/afqmc_implementation.md) -- maps each
+- [`docs/src/afqmc_implementation.md`](docs/src/afqmc_implementation.md) -- maps each
   piece of both theory docs to the actual code (file by file, function by
   function), for when you're reading or modifying `src/afqmc/`.
-- [`docs/tutorial.md`](docs/tutorial.md) -- hands-on getting-started
+- [`docs/src/tutorial.md`](docs/src/tutorial.md) -- hands-on getting-started
   walkthrough of all three methods; start here if you're new.
 
 ## Examples

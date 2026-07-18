@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+LatticeMC = "5b19d9e7-12ad-4dbf-b60a-efc713ae8b0a"
+
+[compat]
+Documenter = "1"

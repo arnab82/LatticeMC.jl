@@ -25,7 +25,7 @@ end
 #     different spins never contract against each other)
 # Summed over both same-spin channels and both cross-spin orderings, this
 # collapses to the compact form below with Gt = G_up + G_down (derivation
-# in docs/afqmc_ab_initio_theory.md; cross-checked to match the Hubbard
+# in docs/src/afqmc_ab_initio_theory.md; cross-checked to match the Hubbard
 # on-site special case in test/ab_initio.jl).
 function local_energy_ab_initio(mi::MolecularIntegrals, walker::AbInitioWalker, trial::AbInitioTrial)
     G_up = greens_function_ab_initio(walker.phi_up, trial.phi_up)

@@ -80,7 +80,7 @@ end
 # Returns a complex AbInitioTrial with (generally different) phi_up, phi_down
 # -- drop-in for build_rhf_trial everywhere an AbInitioTrial is expected.
 # Useful when a single RHF determinant is a poor reference (see
-# docs/afqmc_ab_initio_theory.md section 6 for the measured H4 case this was
+# docs/src/afqmc_ab_initio_theory.md section 6 for the measured H4 case this was
 # built to address).
 function build_uhf_trial_ab_initio(mi::MolecularIntegrals, Nup::Int, Ndown::Int; kwargs...)
     C_up, C_down, _ = uhf_scf(mi, Nup, Ndown; kwargs...)

@@ -4,7 +4,7 @@ Hamiltonian, using a Cholesky-decomposed two-electron tensor and complex
 walkers/trial. `force_bias=true` uses the static (trial-based) mean-field
 shift for a modest variance reduction (propagate_step_ab_initio_force_bias!);
 does not change the phaseless approximation's own asymptotic bias, which is
-not a variance effect -- see docs/afqmc_ab_initio_theory.md section 7.1.
+not a variance effect -- see docs/src/afqmc_ab_initio_theory.md section 7.1.
 Local energy is direct-tensor, not Cholesky-vector-based -- see the theory
 doc for what that means and what's deferred as future work.
 
