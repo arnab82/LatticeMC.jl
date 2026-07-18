@@ -287,6 +287,28 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   ..block_average` at the top of the submodule -- it's fully generic over
   the energy trace type, no `_ab_initio` variant needed).
 
+  **Energy shift (`energy_shift`, default = the trial's own energy).** Each
+  step multiplies every walker's weight by the constant
+  `exp(dtau*energy_shift)`. This is invisible to the energy estimator -- a
+  global per-step scale on all weights cancels exactly in
+  `sum(w*E)/sum(w)`, and population control uses only relative weights -- so
+  it changes no physics (tested: matched-seed runs with wildly different
+  shifts agree to ~1e-15). Its *only* job is numerical: without it, the
+  mean per-step weight is `~exp(-dtau*E_loc)`, which for a large-|E| system
+  grows like `exp(dtau*|E|)` per step and overflows Float64 within a few
+  thousand steps (all-electron N2 at ~-107 Ha hit this: fine energy
+  estimate, then NaN from Inf/Inf partway through the run). Setting the
+  shift to the trial energy makes per-step growth ~1. The H-only STO-3G
+  test systems have small enough |E| (~1-2 Ha) that they never triggered
+  the overflow, which is why this was added only when N2/F2 via FCIDUMP
+  were first attempted. Two things to know for large all-electron systems:
+  (1) the shift is *necessary*, not optional, and (2) it does not fix
+  walker mortality under the phaseless gate -- a separate failure mode seen
+  for F2, where an RHF trial's phase structure is poorly aligned and
+  walkers get killed faster than population control replenishes them unless
+  `dtau` is made small (F2/STO-3G needed `dtau ~ 0.001`, vs `0.005` enough
+  for N2).
+
 ### If you're about to trust a result on a new molecule
 
 Read theory doc §6 first. The short version: this implementation's accuracy

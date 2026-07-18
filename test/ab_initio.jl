@@ -211,6 +211,37 @@ end
     @test isapprox(result.energy_mean, e_fci; atol=0.08)
 end
 
+# --- energy_shift is a pure numerical-stabilization knob: multiplying every
+# walker's weight by the same per-step constant exp(dtau*energy_shift)
+# cancels in the weighted-average estimator and doesn't touch the random-
+# number stream (population control uses only *relative* weights, scale-
+# invariant; the estimator only ratios), so with a matched seed two very
+# different shift values produce the *same* energy trace to machine
+# precision. This is the exact statement of "changes no physics" (the small
+# residual is only floating-point rounding from scaling weights by different
+# constants -- measured ~5e-15 here, and crucially *not* O(1), i.e. no
+# divergent resampling picks). Much stronger than a statistical comparison.
+# (The shift's actual purpose -- preventing weight overflow for large-|E|
+# systems like all-electron N2/F2 at ~-100/-200 Ha, where unshifted weights
+# grow like exp(dtau*|E|) per step -- can't be exercised with the H-only
+# STO-3G engine, but follows from this invariance plus choosing the shift to
+# keep per-step growth ~1.) ---
+@testset "energy_shift changes no physics (identical trace to machine precision)" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=2)
+    trial = LatticeMC.build_rhf_trial(mi, 1, 1)
+
+    Random.seed!(31415)
+    r0 = LatticeMC.run_afqmc_ab_initio(mi, trial, 1, 1; dtau=0.01, num_walkers=100,
+                                        num_steps=600, equilibration_steps=100, energy_shift=0.0)
+    Random.seed!(31415)
+    r1 = LatticeMC.run_afqmc_ab_initio(mi, trial, 1, 1; dtau=0.01, num_walkers=100,
+                                        num_steps=600, equilibration_steps=100, energy_shift=-50.0)
+
+    @test length(r0.energy_trace) == length(r1.energy_trace)
+    @test maximum(abs.(r0.energy_trace .- r1.energy_trace)) < 1e-12
+    @test isapprox(r0.energy_mean, r1.energy_mean; atol=1e-12)
+end
+
 # --- build_uhf_trial_ab_initio's whole point: at a stretched geometry where
 # RHF is a qualitatively poor reference (the standard bond-dissociation
 # instability), swapping in the symmetry-broken UHF trial should give a
