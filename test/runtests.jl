@@ -11,4 +11,7 @@ using LatticeMC
         include("./afqmc_units.jl")
         include("./afqmc_convergence.jl")
     end
+    @testset "AFQMC ab initio" begin
+        include("./ab_initio.jl")
+    end
 end

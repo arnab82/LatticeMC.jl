@@ -184,6 +184,75 @@ with a proper blocking/autocorrelation analysis.
    `eigen(Symmetric(lattice.K)).values` for repeated values near the Fermi
    level before trusting a new geometry's AFQMC results.
 
+## `ab_initio/` -- general (molecular) Hamiltonian AFQMC
+
+A separate nested submodule (`AFQMC.AbInitio`, re-exported up to `LatticeMC`
+directly, e.g. `LatticeMC.run_afqmc_ab_initio`), parallel to the Hubbard
+files above and touching none of them. See
+[`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md) for the derivations
+-- this section is the file-by-file map, same style as above. Naming
+convention: every ab initio name is either a distinct noun
+(`AbInitioWalker`, `AbInitioTrial`, `MolecularIntegrals`) or has an
+`_ab_initio` suffix (`local_energy_ab_initio`, `propagate_step_ab_initio!`,
+...), so nothing collides with the real/Hubbard names when both are
+`using`-imported into the same scope -- deliberate, to avoid the Julia
+multiple-dispatch-across-modules ambiguity that sharing names like
+`orthonormalize!` would have introduced.
+
+- **`integrals.jl`** -- `MolecularIntegrals` (`Ns`, `h1e`, `h2e`, `E_nuc`)
+  and `read_fcidump` (standard FCIDUMP text format parser, real orbitals,
+  8-fold ERI symmetry fill-out).
+- **`sto3g_hydrogens.jl`** -- the self-contained STO-3G integral engine
+  (theory §2): primitive Gaussian overlap/kinetic/nuclear-attraction/ERI
+  formulas, contraction normalization, `lowdin_orthogonalize`, and
+  `build_h_chain_sto3g`. The Boys-function small-$t$ branch
+  (`boys_f0`) matters more than it looks -- same-center integrals hit
+  $t\to0$ constantly for a chain of atoms.
+- **`cholesky.jl`** -- `cholesky_decompose_eri` (pivoted Cholesky, theory
+  §3) and `modified_one_body` (the $h1e^{\rm mod}$ exchange correction).
+- **`rhf_trial.jl`** -- `AbInitioTrial` (the complex trial-wavefunction
+  struct, defined here since this is its first use site), `rhf_scf` (returns
+  orbitals + total energy, used directly in tests for the variational-bound
+  check), `build_rhf_trial` (wraps `rhf_scf`, returns the `AbInitioTrial`).
+  Closed-shell only (`Nup == Ndown`, throws otherwise) -- there's no ab
+  initio analogue of `build_uhf_trial` yet (see §6 of the theory doc for why
+  that's the natural next thing to build, not this).
+- **`walker.jl`** -- `AbInitioWalker`, `init_ab_initio_walkers`,
+  `orthonormalize_ab_initio!`. Complex QR; the "no weight compensation
+  needed" argument from theory §10 is unchanged by working over $\mathbb{C}$
+  (it only used that $G$ is invariant under $\phi\to\phi A$ for invertible
+  $A$, real or complex).
+- **`estimators.jl`** -- `greens_function_ab_initio` / `overlap_ab_initio` /
+  `walker_overlap_ab_initio` (same Thouless-theorem formulas, complex);
+  `local_energy_ab_initio` (the generalized-Wick's-theorem formula, theory
+  doc's `estimators.jl` cross-reference above -- verified during development
+  against an explicit many-body CI-vector calculation for a generic, fully
+  asymmetric complex walker, not just the symmetric trial-equals-walker
+  case); `mixed_energy_estimator_ab_initio` (weighted average, `real(...)`
+  at the end).
+- **`propagator.jl`** -- `apply_one_body_ab_initio!`,
+  `propagate_step_ab_initio!` (theory §4-§5: sample the joint Gaussian,
+  build `dK`, one matrix exponential, phaseless gate).
+- **`population_control.jl`** -- `population_control_ab_initio!`, same comb
+  algorithm as the real version, `ComplexF64`-typed.
+- **`driver.jl`** -- `run_afqmc_ab_initio`. Builds the Cholesky vectors and
+  `h1e_mod` once at the start (not per step), then the same
+  propagate/stabilize/population-control/measure loop structure as
+  `run_afqmc`; reuses `block_average` directly (imported via `import
+  ..block_average` at the top of the submodule -- it's fully generic over
+  the energy trace type, no `_ab_initio` variant needed).
+
+### If you're about to trust a result on a new molecule
+
+Read theory doc §6 first. The short version: this implementation's accuracy
+is trial-quality-dependent in a way that isn't obvious from the code alone
+-- H2 near equilibrium is essentially exact (~93% of correlation energy),
+H4 recovers only ~10% with the same settings. Before trusting a number,
+either (a) pick a system you have reason to believe is well-described by a
+single RHF determinant, or (b) cross-check against
+`test/ab_initio_fci_reference.jl`'s FCI if the system is small enough
+(`Ns` up to ~12-14, same practical ED ceiling as the Hubbard side).
+
 ## Adding attractive-`U` support
 
 `hs_gamma` explicitly rejects `U < 0`. The attractive Hubbard model needs a

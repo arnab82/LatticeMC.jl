@@ -36,7 +36,17 @@ export HubbardLattice, build_hubbard_chain, build_hubbard_square,
        local_update_ratio, rank1_update_greens_function!,
        build_expK_half, hs_gamma, propagate_step!,
        population_control!,
-       run_afqmc, block_average
+       run_afqmc, block_average,
+       MolecularIntegrals, read_fcidump,
+       build_h_chain_sto3g,
+       cholesky_decompose_eri, modified_one_body,
+       AbInitioTrial, build_rhf_trial, rhf_scf,
+       AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
+       greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
+       local_energy_ab_initio, mixed_energy_estimator_ab_initio,
+       propagate_step_ab_initio!,
+       population_control_ab_initio!,
+       run_afqmc_ab_initio
 
 include("afqmc/lattice.jl")
 include("afqmc/trial_wavefunction.jl")
@@ -46,6 +56,39 @@ include("afqmc/estimators.jl")
 include("afqmc/propagator.jl")
 include("afqmc/population_control.jl")
 include("afqmc/driver.jl")
+
+module AbInitio
+
+using LinearAlgebra
+using Random
+using Statistics
+using SpecialFunctions
+import ..block_average
+
+export MolecularIntegrals, read_fcidump,
+       build_h_chain_sto3g,
+       cholesky_decompose_eri, modified_one_body,
+       AbInitioTrial, build_rhf_trial, rhf_scf,
+       AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
+       greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
+       local_energy_ab_initio, mixed_energy_estimator_ab_initio,
+       propagate_step_ab_initio!,
+       population_control_ab_initio!,
+       run_afqmc_ab_initio
+
+include("afqmc/ab_initio/integrals.jl")
+include("afqmc/ab_initio/sto3g_hydrogens.jl")
+include("afqmc/ab_initio/cholesky.jl")
+include("afqmc/ab_initio/rhf_trial.jl")
+include("afqmc/ab_initio/walker.jl")
+include("afqmc/ab_initio/estimators.jl")
+include("afqmc/ab_initio/propagator.jl")
+include("afqmc/ab_initio/population_control.jl")
+include("afqmc/ab_initio/driver.jl")
+
+end # module AbInitio
+
+using .AbInitio
 
 end # module AFQMC
 

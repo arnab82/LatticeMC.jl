@@ -7,8 +7,8 @@
 
 ## Overview
 
-A Julia package for Monte Carlo simulation of lattice models in statistical
-mechanics and condensed matter physics, organized as two submodules:
+A Julia package for Monte Carlo simulation in statistical mechanics and
+condensed matter/quantum chemistry, organized as three submodules:
 
 - **`LatticeMC.Ising`** -- classical Metropolis Monte Carlo for the 2D Ising
   model: spin configurations, magnetization, energy, heat capacity, and
@@ -20,9 +20,18 @@ mechanics and condensed matter physics, organized as two submodules:
   wavefunction via a discrete Hubbard-Stratonovich transform of the on-site
   interaction, with population control and a constrained-path approximation
   to control the fermion sign problem.
+- **`LatticeMC.AFQMC.AbInitio`** -- the same AFQMC family for general
+  (molecular) Hamiltonians: complex walkers, a Cholesky-decomposed
+  two-electron tensor, a continuous Hubbard-Stratonovich transform, a
+  Hartree-Fock trial, and a self-contained STO-3G integral engine for
+  hydrogen chains (no external quantum chemistry dependency).
 
-Both submodules re-export their public API at the top level, so
-`LatticeMC.IsingModel(...)` and `LatticeMC.run_afqmc(...)` both work directly.
+All three re-export their public API at the top level, so
+`LatticeMC.IsingModel(...)`, `LatticeMC.run_afqmc(...)`, and
+`LatticeMC.run_afqmc_ab_initio(...)` all work directly.
+
+**New here?** Start with [`docs/tutorial.md`](docs/tutorial.md) -- a
+hands-on walkthrough of all three methods -- rather than this README.
 
 ## Features
 
@@ -60,6 +69,33 @@ full production run (hundreds of walkers, thousands of steps) in well under a
 few minutes; beyond that, runtime grows quickly and would need further
 optimization (delayed updates, sparser K, GPU) not implemented here.
 
+### Ab initio AFQMC (quantum MC, molecular)
+
+- General one-/two-electron integrals: plain Julia arrays
+  (`MolecularIntegrals`) or `read_fcidump` for the standard text format.
+- A self-contained STO-3G integral engine for hydrogen chains
+  (`build_h_chain_sto3g`) -- analytical Gaussian integrals + Loewdin
+  orthogonalization, no PySCF/Python dependency, works in CI as-is.
+- Pivoted Cholesky decomposition of the two-electron tensor
+  (`cholesky_decompose_eri`) and the associated one-body exchange
+  correction, feeding a continuous (Gaussian-field) Hubbard-Stratonovich
+  transform -- one matrix exponential per step, not one per Cholesky vector.
+- Restricted (closed-shell) Hartree-Fock trial (`build_rhf_trial`).
+- Complex walkers and the general complex phaseless gate (`w *= |I|*max(0,
+  cos(arg I))`), of which the Hubbard side's real sign-flip gate is the
+  real/discrete special case.
+
+**Read before trusting a result**: this is deliberately a "Tier 1"
+implementation (no force-bias/mean-field-shifted sampling, direct-tensor not
+Cholesky-vector local energy) -- correct, but its accuracy is strongly
+trial-quality-dependent, more so than you'd guess from the code. Measured
+during development: H2 near equilibrium recovers ~93% of the correlation
+energy with a plain RHF trial; H4 (more multi-reference character) recovers
+only ~10% with the same settings. See
+[`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) section 6
+for the full account (including the cross-validation that ruled out a bug)
+before drawing conclusions on a new system.
+
 ## Documentation
 
 - [`docs/afqmc_theory.md`](docs/afqmc_theory.md) -- step-by-step derivation of
@@ -75,6 +111,16 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
   pseudocode for the outer population loop, the per-walker Trotter step
   (including the rank-1-update inner loop), and population control, each
   cross-referenced to the theory section and the implementing function.
+- [`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) --
+  addendum for the ab initio case: the general Hamiltonian, orbital
+  orthonormality, the Cholesky decomposition and its one-body exchange
+  correction, the continuous Hubbard-Stratonovich transform, the complex
+  phaseless gate, and the measured trial-quality dependence (section 6).
+- [`docs/afqmc_implementation.md`](docs/afqmc_implementation.md) -- maps each
+  piece of both theory docs to the actual code (file by file, function by
+  function), for when you're reading or modifying `src/afqmc/`.
+- [`docs/tutorial.md`](docs/tutorial.md) -- hands-on getting-started
+  walkthrough of all three methods; start here if you're new.
 
 ## Examples
 
@@ -86,19 +132,27 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
   and statistical convergence (`energy_err` vs `num_steps`).
 - `example/afqmc_square_lattice.jl` -- a 2D square-lattice (not just chain)
   AFQMC run.
+- `example/afqmc_h4_example.jl` -- ab initio AFQMC on an H4 chain (STO-3G),
+  reporting AFQMC/RHF/FCI together and the recovered-correlation percentage
+  directly (see the ab initio theory doc before reading too much into it).
 
 ## Testing
 
 `test/runtests.jl` runs, beyond the original Ising regression test:
 `test/ising.jl` (closed-form and statistical checks for the classical
-model), `test/afqmc.jl` (AFQMC vs. a from-scratch exact-diagonalization
-reference across multiple geometries/fillings/`U` values),
+model), `test/afqmc.jl` (Hubbard AFQMC vs. a from-scratch exact-
+diagonalization reference across multiple geometries/fillings/`U` values),
 `test/afqmc_units.jl` (component-level correctness -- notably that the
-rank-1 fast update exactly matches a brute-force recompute), and
+rank-1 fast update exactly matches a brute-force recompute),
 `test/afqmc_convergence.jl` (statistical-error and population-control-bias
-behavior). `test/ed_reference.jl` holds the shared bitmask exact-
-diagonalization code used by several of these and by
-`example/afqmc_phase_diagram.jl`.
+behavior), and `test/ab_initio.jl` (STO-3G integral sanity checks against a
+known textbook value, Cholesky reconstruction, the RHF variational bound
+and dissociation-catastrophe trend, and AFQMC vs. FCI on H2/H4 with
+tolerances calibrated to each system's measured, honest behavior --  not
+uniformly tight). `test/ed_reference.jl` (Hubbard-specialized) and
+`test/ab_initio_fci_reference.jl` (general Slater-Condon, cross-validated
+against the former as a special case) hold the shared exact-diagonalization
+code reused across the test suite and the phase-diagram/H4 examples.
 
 ## Installation
 ```bash
@@ -132,6 +186,12 @@ h2 = LatticeMC.build_hubbard_chain(6, 1.0, 8.0; pbc=false)
 afm_trial = LatticeMC.build_uhf_trial(h2, 3, 3)
 result2 = LatticeMC.run_afqmc(h2, afm_trial, 3, 3)
 println(result2.energy_mean, " +/- ", result2.energy_err)
+
+# Ab initio AFQMC (H2, STO-3G, near equilibrium -- no external QC package needed)
+mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=2)
+rhf_trial = LatticeMC.build_rhf_trial(mi, 1, 1)
+result3 = LatticeMC.run_afqmc_ab_initio(mi, rhf_trial, 1, 1)
+println(result3.energy_mean, " +/- ", result3.energy_err)
 ```
 
 ## Copyright
