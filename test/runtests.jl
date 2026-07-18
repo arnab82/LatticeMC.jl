@@ -1,5 +1,14 @@
 using Test
-using MonteCarlo_ising
-@testset "MonteCarlo_ising.jl" begin
-    include("./energy.jl")
+using LatticeMC
+
+@testset "LatticeMC.jl" begin
+    @testset "Ising" begin
+        include("./energy.jl")
+        include("./ising.jl")
+    end
+    @testset "AFQMC" begin
+        include("./afqmc.jl")
+        include("./afqmc_units.jl")
+        include("./afqmc_convergence.jl")
+    end
 end
