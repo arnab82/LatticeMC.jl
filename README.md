@@ -80,7 +80,11 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
   (`cholesky_decompose_eri`) and the associated one-body exchange
   correction, feeding a continuous (Gaussian-field) Hubbard-Stratonovich
   transform -- one matrix exponential per step, not one per Cholesky vector.
-- Restricted (closed-shell) Hartree-Fock trial (`build_rhf_trial`).
+- Restricted (closed-shell) Hartree-Fock trial (`build_rhf_trial`), and an
+  unrestricted (symmetry-broken) alternative (`build_uhf_trial_ab_initio`)
+  for geometries where RHF stops being qualitatively adequate (the standard
+  bond-dissociation instability) -- collapses back to RHF where that
+  instability hasn't kicked in yet, so it's always safe to use.
 - Complex walkers and the general complex phaseless gate (`w *= |I|*max(0,
   cos(arg I))`), of which the Hubbard side's real sign-flip gate is the
   real/discrete special case.
@@ -88,13 +92,16 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
 **Read before trusting a result**: this is deliberately a "Tier 1"
 implementation (no force-bias/mean-field-shifted sampling, direct-tensor not
 Cholesky-vector local energy) -- correct, but its accuracy is strongly
-trial-quality-dependent, more so than you'd guess from the code. Measured
-during development: H2 near equilibrium recovers ~93% of the correlation
-energy with a plain RHF trial; H4 (more multi-reference character) recovers
-only ~10% with the same settings. See
-[`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) section 6
-for the full account (including the cross-validation that ruled out a bug)
-before drawing conclusions on a new system.
+trial-quality-dependent, more so than you'd guess from the code. Measured on
+H4: near equilibrium, ~11% of the correlation energy is recovered (a Tier-1
+sampling limitation, not a trial problem -- the UHF trial doesn't help here,
+it correctly collapses to RHF); stretched, the plain RHF trial actually gets
+*worse than mean-field* (RHF's own dissociation-catastrophe instability
+poisoning the trial) while the UHF trial recovers ~75%. H2, which stays
+single-reference throughout, recovers ~93% with just the RHF trial. See
+[`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) sections
+6-7 for the full account (including the cross-validation that ruled out a
+bug) before drawing conclusions on a new system.
 
 ## Documentation
 
@@ -192,6 +199,13 @@ mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=2)
 rhf_trial = LatticeMC.build_rhf_trial(mi, 1, 1)
 result3 = LatticeMC.run_afqmc_ab_initio(mi, rhf_trial, 1, 1)
 println(result3.energy_mean, " +/- ", result3.energy_err)
+
+# ...at a stretched geometry, use the UHF trial instead (RHF's own
+# dissociation-catastrophe instability otherwise poisons the AFQMC result)
+mi_stretched = LatticeMC.build_h_chain_sto3g(3.0; n_atoms=4)
+uhf_trial = LatticeMC.build_uhf_trial_ab_initio(mi_stretched, 2, 2)
+result4 = LatticeMC.run_afqmc_ab_initio(mi_stretched, uhf_trial, 2, 2)
+println(result4.energy_mean, " +/- ", result4.energy_err)
 ```
 
 ## Copyright

@@ -97,16 +97,30 @@ Or hand it integrals from elsewhere via FCIDUMP:
 mi = LatticeMC.read_fcidump("path/to/FCIDUMP")
 ```
 
+At a stretched/dissociating geometry, RHF itself becomes qualitatively
+unreliable (the standard bond-dissociation instability) and poisons the
+AFQMC trial -- swap in the unrestricted (symmetry-broken) trial, same call
+signature, and it's always safe to use (it collapses back to RHF wherever
+that instability hasn't kicked in, e.g. near equilibrium):
+
+```julia
+uhf_trial = LatticeMC.build_uhf_trial_ab_initio(mi, 1, 1)
+```
+
 **Read this before trusting a result on a new molecule**: ab initio AFQMC's
-accuracy here depends heavily on how well a single RHF determinant describes
-your system. H2 near equilibrium is recovered almost exactly (~93% of the
-correlation energy); H4 (four hydrogens -- more multi-reference character)
-recovers only ~10% with the same plain-RHF, no-force-bias setup. This isn't
-a bug, it's measured and explained in
-[`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md#6-tier-1-scope-what-s-simplified-and-what-that-costs-measured) --
-read it before drawing conclusions from a result on a system you suspect has
-real multi-reference character. `example/afqmc_h4_example.jl` shows this
-directly (reports the recovered-correlation percentage, doesn't hide it).
+accuracy here depends heavily on how well the trial describes your system,
+in two somewhat different ways. Measured on H4: near equilibrium, ~11% of
+the correlation energy is recovered with either trial (the UHF trial
+correctly collapses to RHF there -- that gap is a Tier-1 sampling
+limitation, not a trial problem); stretched, the plain RHF trial actually
+does *worse than mean-field* while the UHF trial recovers ~75%. H2, which
+stays single-reference throughout, recovers ~93% with just RHF. None of this
+is a bug -- it's measured and explained in
+[`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md) sections 6-7. Read
+it before drawing conclusions from a result on a system you suspect has real
+multi-reference character. `example/afqmc_h4_example.jl` shows the
+equilibrium case directly (reports the recovered-correlation percentage,
+doesn't hide it).
 
 For small molecules, `test/ab_initio_fci_reference.jl`'s
 `ab_initio_fci_ground_state_energy` gives you an exact comparison point the

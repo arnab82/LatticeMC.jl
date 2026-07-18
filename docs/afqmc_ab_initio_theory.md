@@ -119,16 +119,63 @@ sampling variance that force-bias would fix.
 
 **Why H4 and not H2**: H2's two electrons in one bonding orbital are well
 described by a single RHF determinant even somewhat away from equilibrium
-(RHF still captures the qualitative physics). Four separated-but-interacting
-hydrogens have more open-shell/multi-configurational character that a single
-paramagnetic determinant doesn't represent well -- the same phenomenon
-already seen on the Hubbard side (`build_uhf_trial`'s antiferromagnetic seed
-exists precisely because the plain paramagnetic trial is a poor reference in
-exactly this kind of regime). The fix here would be the analogous one: a
-symmetry-broken (unrestricted) ab initio trial, and/or the force-bias
-refinement done properly (self-consistently, not the single hand-rolled
-variant tried during development) -- both real future work, not implemented
-here. `test/ab_initio.jl` tests both systems: H2 with a tight tolerance (as
-a correctness check), H4 with a deliberately loose one (as an honest
-demonstration of this limitation, checking "meaningfully better than RHF",
-not "close to FCI").
+(RHF still captures the qualitative physics). `test/ab_initio.jl` tests both
+systems: H2 with a tight tolerance (as a correctness check), H4 with a
+deliberately loose one (as an honest demonstration of this limitation,
+checking "meaningfully better than RHF", not "close to FCI").
+
+**Update, after building `build_uhf_trial_ab_initio`** (the ab initio
+analogue of the Hubbard side's `build_uhf_trial`, §7 below): the natural
+hypothesis was that H4's gap has the same origin as Hubbard's degenerate/
+paramagnetic-trial problem, fixable the same way. **That hypothesis was
+wrong for the equilibrium-bond-length H4 case specifically** -- at bond=1.4,
+UHF converges back to the exact RHF solution (zero spin polarization; RHF is
+already a locally stable, adequate single-reference description there), so
+the trial is unchanged and the AFQMC result doesn't move. The gap at that
+geometry really is what section 4's discussion says: the phaseless
+constraint's information loss compounding over the walk, not a bad trial.
+
+Where UHF *does* help enormously is stretched H4, a different (and more
+classic) failure mode -- the standard RHF-to-UHF bond-dissociation
+instability, where RHF stops being even a qualitatively adequate reference
+and UHF spontaneously spin-polarizes. Measured on H4 (`Nup=Ndown=2`):
+
+| bond (bohr) | RHF trial captures | UHF trial captures |
+|---|---|---|
+| 1.4 (equilibrium) | ~11% | ~11% (UHF == RHF here) |
+| 2.5 | -50% (worse than RHF) | ~39% |
+| 3.0 | -66% (worse than RHF) | ~75% |
+
+("captures" = percent of the RHF-to-FCI gap recovered; negative means the
+AFQMC estimate landed *above* RHF -- a real failure mode of the plain-RHF
+trial at a geometry it doesn't describe qualitatively correctly, not just a
+quantitatively poor one.) So: two genuinely different problems share the
+same symptom ("H4 AFQMC is inaccurate") but need different fixes -- trial
+symmetry breaking fixes the dissociation-instability case, not the
+equilibrium case. The remaining, still-unfixed piece (a properly
+self-consistent mean-field force bias, not the single hand-rolled variant
+tried during development) is what would address the equilibrium gap; still
+real future work.
+
+## 7. Unrestricted Hartree-Fock trial (`build_uhf_trial_ab_initio`)
+
+Same idea as `build_uhf_trial` on the Hubbard side, generalized from the
+on-site-$U$ mean field to the full two-electron tensor: separate spatial
+orbitals per spin, each solving its own Fock equation
+
+$$F_\uparrow = h1e + \sum_{\lambda\sigma}P^{\rm tot}_{\lambda\sigma}(\mu\nu|\lambda\sigma) - \sum_{\lambda\sigma}P^\uparrow_{\lambda\sigma}(\mu\lambda|\nu\sigma), \qquad F_\downarrow \text{ (same, } P^\downarrow\text{ in the exchange term)}$$
+
+($P^{\rm tot}=P^\uparrow+P^\downarrow$; Coulomb sees every electron, exchange
+only same-spin ones, i.e. Pauli exclusion). This reduces exactly to
+`rhf_scf`'s Fock matrix when $P^\uparrow=P^\downarrow=P^{\rm tot}/2$, so UHF
+is a strict variational generalization of RHF: its converged energy can only
+be $\le E_{\rm RHF}$, with equality exactly when the unrestricted
+optimization finds no benefit to spin-polarizing (verified in
+`test/ab_initio.jl`, both the inequality and the H4-specific "collapses at
+equilibrium, polarizes when stretched" behavior above).
+
+Symmetry-breaking seed: an alternating-site-parity density bias (odd sites
+seeded toward spin-up, even toward spin-down) -- simple because it only
+needs to handle the linear chains `build_h_chain_sto3g` produces; would need
+a proper geometry-aware coloring (like Hubbard's `bipartite_coloring`, which
+works from the lattice graph) for a future non-chain ab initio builder.

@@ -214,9 +214,37 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   struct, defined here since this is its first use site), `rhf_scf` (returns
   orbitals + total energy, used directly in tests for the variational-bound
   check), `build_rhf_trial` (wraps `rhf_scf`, returns the `AbInitioTrial`).
-  Closed-shell only (`Nup == Ndown`, throws otherwise) -- there's no ab
-  initio analogue of `build_uhf_trial` yet (see §6 of the theory doc for why
-  that's the natural next thing to build, not this).
+  Closed-shell only (`Nup == Ndown`, throws otherwise).
+- **`uhf_trial.jl`** -- `uhf_scf` / `build_uhf_trial_ab_initio`, the ab
+  initio analogue of `uhf_trial.jl`'s Hubbard `build_uhf_trial`: separate
+  `phi_up`/`phi_down` (unlike `rhf_trial.jl`'s shared orbitals), Fock
+  matrices built with Coulomb from the *total* density but exchange only
+  from the *same-spin* density (reduces exactly to `rhf_scf`'s Fock matrix
+  when `P_up == P_down`, a good sanity check if you touch this code).
+  Symmetry-breaking seed is a simple alternating-site-parity density bias --
+  simpler than Hubbard's graph-coloring `bipartite_coloring` since
+  `build_h_chain_sto3g` only produces linear chains so far; would need
+  generalizing for a future non-chain ab initio geometry builder.
+
+  **Measured impact** (this is *why* it exists, not a nice-to-have): on H4,
+  UHF collapses back to the RHF solution near equilibrium (zero moment, no
+  benefit -- as expected, RHF is adequate there) but spontaneously spin-
+  polarizes at stretched bond lengths (the standard RHF-to-UHF dissociation
+  instability), where it gives a dramatically better AFQMC trial:
+
+  | bond (bohr) | RHF trial captures | UHF trial captures |
+  |---|---|---|
+  | 1.4 (near eq.) | ~11% | ~11% (UHF == RHF here) |
+  | 2.5 | -50% (worse than RHF!) | ~39% |
+  | 3.0 | -66% (worse than RHF!) | ~75% |
+
+  ("captures" = percent of the RHF-to-FCI correlation-energy gap recovered;
+  negative means the AFQMC estimate landed *above* RHF, i.e. worse than
+  mean-field -- a real failure mode of the plain-RHF-trial Tier-1 algorithm
+  at a geometry RHF itself doesn't describe qualitatively correctly.) Doesn't
+  help the *equilibrium* H4 case from theory doc §6 -- that gap has a
+  different origin (Tier 1's missing force bias, not trial symmetry) --
+  see the theory doc for the distinction.
 - **`walker.jl`** -- `AbInitioWalker`, `init_ab_initio_walkers`,
   `orthonormalize_ab_initio!`. Complex QR; the "no weight compensation
   needed" argument from theory §10 is unchanged by working over $\mathbb{C}$

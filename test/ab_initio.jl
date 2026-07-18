@@ -80,6 +80,30 @@ end
     @test issorted(gaps)
 end
 
+# --- UHF is a strict variational generalization of RHF (unrestricted
+# optimization contains the restricted solution as a special case), so its
+# converged energy can only be <= RHF's. Near equilibrium H4 is well
+# single-reference: UHF should collapse back to the symmetric (RHF-like,
+# zero-moment) solution. Stretched, it should spontaneously spin-polarize
+# (the standard RHF-to-UHF instability at bond dissociation), giving a
+# strictly lower energy and a nonzero, alternating local-moment pattern. ---
+@testset "UHF: variational bound and symmetry breaking" begin
+    mi_eq = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    _, e_rhf_eq = LatticeMC.rhf_scf(mi_eq, 2)
+    C_up_eq, C_down_eq, e_uhf_eq = LatticeMC.uhf_scf(mi_eq, 2, 2)
+    @test e_uhf_eq <= e_rhf_eq + 1e-6
+    moment_eq = vec(sum(C_up_eq .^ 2, dims=2)) .- vec(sum(C_down_eq .^ 2, dims=2))
+    @test maximum(abs.(moment_eq)) < 0.05   # collapses to the paramagnetic solution
+
+    mi_stretched = LatticeMC.build_h_chain_sto3g(3.0; n_atoms=4)
+    _, e_rhf_st = LatticeMC.rhf_scf(mi_stretched, 2)
+    C_up_st, C_down_st, e_uhf_st = LatticeMC.uhf_scf(mi_stretched, 2, 2)
+    @test e_uhf_st < e_rhf_st - 0.05   # strictly, substantially lower
+    moment_st = vec(sum(C_up_st .^ 2, dims=2)) .- vec(sum(C_down_st .^ 2, dims=2))
+    @test maximum(abs.(moment_st)) > 0.3   # real spin polarization developed
+    @test all(sign(moment_st[i]) != sign(moment_st[i+1]) for i in 1:3)   # alternating
+end
+
 # --- local_energy_ab_initio must exactly reproduce E_RHF at the (U=0-like)
 # deterministic point where the walker equals the trial itself -- no
 # stochastic component, same spirit as the Hubbard U=0 sanity check. ---
@@ -129,4 +153,33 @@ end
                                             stabilize_every=5, pop_control_every=10)
     @test result.energy_mean < e_rhf - 0.002   # captures some correlation, below mean-field
     @test isapprox(result.energy_mean, e_fci; atol=0.08)
+end
+
+# --- build_uhf_trial_ab_initio's whole point: at a stretched geometry where
+# RHF is a qualitatively poor reference (the standard bond-dissociation
+# instability), swapping in the symmetry-broken UHF trial should give a
+# dramatically better AFQMC result -- a large, comparative effect (measured
+# during development: ~75% of the correlation energy recovered vs. AFQMC
+# actually landing *above* RHF, i.e. worse than mean-field, with the plain
+# RHF trial), so this comparison is robust/non-flaky despite being
+# stochastic. Near equilibrium, UHF collapses to RHF (previous testset), so
+# no improvement is expected there -- not tested here for that reason. ---
+@testset "UHF trial substantially improves AFQMC at a stretched geometry" begin
+    mi = LatticeMC.build_h_chain_sto3g(3.0; n_atoms=4)
+    e_fci = ab_initio_fci_ground_state_energy(mi.h1e, mi.h2e, 2, 2; E_nuc=mi.E_nuc)
+
+    rhf_trial = LatticeMC.build_rhf_trial(mi, 2, 2)
+    uhf_trial = LatticeMC.build_uhf_trial_ab_initio(mi, 2, 2)
+
+    Random.seed!(7)
+    result_rhf = LatticeMC.run_afqmc_ab_initio(mi, rhf_trial, 2, 2; dtau=0.01, num_walkers=300,
+                                                num_steps=2000, equilibration_steps=400,
+                                                stabilize_every=5, pop_control_every=10)
+    Random.seed!(7)
+    result_uhf = LatticeMC.run_afqmc_ab_initio(mi, uhf_trial, 2, 2; dtau=0.01, num_walkers=300,
+                                                num_steps=2000, equilibration_steps=400,
+                                                stabilize_every=5, pop_control_every=10)
+
+    @test abs(result_uhf.energy_mean - e_fci) < abs(result_rhf.energy_mean - e_fci) - 0.1
+    @test isapprox(result_uhf.energy_mean, e_fci; atol=0.15)
 end

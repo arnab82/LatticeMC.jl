@@ -41,6 +41,7 @@ export HubbardLattice, build_hubbard_chain, build_hubbard_square,
        build_h_chain_sto3g,
        cholesky_decompose_eri, modified_one_body,
        AbInitioTrial, build_rhf_trial, rhf_scf,
+       build_uhf_trial_ab_initio, uhf_scf,
        AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
@@ -69,6 +70,7 @@ export MolecularIntegrals, read_fcidump,
        build_h_chain_sto3g,
        cholesky_decompose_eri, modified_one_body,
        AbInitioTrial, build_rhf_trial, rhf_scf,
+       build_uhf_trial_ab_initio, uhf_scf,
        AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
@@ -80,6 +82,7 @@ include("afqmc/ab_initio/integrals.jl")
 include("afqmc/ab_initio/sto3g_hydrogens.jl")
 include("afqmc/ab_initio/cholesky.jl")
 include("afqmc/ab_initio/rhf_trial.jl")
+include("afqmc/ab_initio/uhf_trial.jl")
 include("afqmc/ab_initio/walker.jl")
 include("afqmc/ab_initio/estimators.jl")
 include("afqmc/ab_initio/propagator.jl")
