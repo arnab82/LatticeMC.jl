@@ -242,9 +242,11 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   negative means the AFQMC estimate landed *above* RHF, i.e. worse than
   mean-field -- a real failure mode of the plain-RHF-trial Tier-1 algorithm
   at a geometry RHF itself doesn't describe qualitatively correctly.) Doesn't
-  help the *equilibrium* H4 case from theory doc §6 -- that gap has a
-  different origin (Tier 1's missing force bias, not trial symmetry) --
-  see the theory doc for the distinction.
+  help the *equilibrium* H4 case from theory doc §6 -- that gap is the
+  phaseless approximation's own asymptotic bias for this trial, not a trial-
+  symmetry or sampling-variance problem (force bias doesn't fix it either,
+  see §7.1 in the theory doc and the `propagator.jl` section below) -- see
+  the theory doc for the distinction.
 - **`walker.jl`** -- `AbInitioWalker`, `init_ab_initio_walkers`,
   `orthonormalize_ab_initio!`. Complex QR; the "no weight compensation
   needed" argument from theory §10 is unchanged by working over $\mathbb{C}$
@@ -260,11 +262,26 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   at the end).
 - **`propagator.jl`** -- `apply_one_body_ab_initio!`,
   `propagate_step_ab_initio!` (theory §4-§5: sample the joint Gaussian,
-  build `dK`, one matrix exponential, phaseless gate).
+  build `dK`, one matrix exponential, phaseless gate). Also
+  `force_bias_shift` and `propagate_step_ab_initio_force_bias!` (theory
+  §7.1): the same Trotter step, but the Gaussian is sampled from
+  `N(fbar, I)` instead of `N(0, I)` and the weight gets an extra exact
+  Radon-Nikodym factor for that change of distribution. `fbar` **must** be
+  computed once via `force_bias_shift(trial, Ls, dtau)` (uses the trial's
+  own density, not each walker's) and passed in -- a walker-adaptive
+  version (recomputing the shift from each walker's own Green's function
+  every step) was tried first and *increased* variance instead of reducing
+  it (theory §7.1 has the measured numbers and the reason: the shift itself
+  becomes a noisy quantity correlated with the walker's own fluctuations).
+  If you're tempted to make this "smarter" by re-adapting it per walker,
+  read that section first.
 - **`population_control.jl`** -- `population_control_ab_initio!`, same comb
   algorithm as the real version, `ComplexF64`-typed.
 - **`driver.jl`** -- `run_afqmc_ab_initio`. Builds the Cholesky vectors and
-  `h1e_mod` once at the start (not per step), then the same
+  `h1e_mod` once at the start (not per step); if `force_bias=true`, also
+  computes `fbar` once here (not per step, not per walker) and dispatches
+  to `propagate_step_ab_initio_force_bias!` instead of the plain propagator
+  for every walker every step. Otherwise the same
   propagate/stabilize/population-control/measure loop structure as
   `run_afqmc`; reuses `block_average` directly (imported via `import
   ..block_average` at the top of the submodule -- it's fully generic over

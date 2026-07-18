@@ -119,6 +119,62 @@ end
     end
 end
 
+# --- force_bias_shift / propagate_step_ab_initio_force_bias!: with a
+# zero shift, the force-biased propagator must be *exactly* identical to the
+# plain one (not just "close", not just "unbiased in distribution") --
+# fbar=0 makes x=xi (nothing shifted) and the Radon-Nikodym factor
+# exp(-0-0)=1, so with matched randomness the two code paths must produce
+# bit-identical walkers. A strong, deterministic correctness check on the
+# force-bias machinery itself, independent of any statistical comparison. ---
+@testset "propagate_step_ab_initio_force_bias! reduces to the plain propagator at fbar=0" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    trial = LatticeMC.build_rhf_trial(mi, 2, 2)
+    Ls = LatticeMC.cholesky_decompose_eri(mi.h2e; threshold=1e-8)
+    h1e_mod = LatticeMC.modified_one_body(mi.h1e, Ls)
+    dtau = 0.01
+    expH1_half = exp(-dtau / 2 .* h1e_mod)
+    fbar_zero = zeros(length(Ls))
+
+    Random.seed!(4242)
+    walker_plain = LatticeMC.AbInitioWalker(copy(trial.phi_up), copy(trial.phi_down), 1.0)
+    LatticeMC.propagate_step_ab_initio!(walker_plain, mi, trial, expH1_half, Ls, dtau)
+
+    Random.seed!(4242)
+    walker_fb = LatticeMC.AbInitioWalker(copy(trial.phi_up), copy(trial.phi_down), 1.0)
+    LatticeMC.propagate_step_ab_initio_force_bias!(walker_fb, mi, trial, expH1_half, Ls, dtau, fbar_zero)
+
+    @test isapprox(walker_plain.phi_up, walker_fb.phi_up; atol=1e-12)
+    @test isapprox(walker_plain.phi_down, walker_fb.phi_down; atol=1e-12)
+    @test isapprox(walker_plain.weight, walker_fb.weight; atol=1e-12)
+end
+
+@testset "force_bias_shift returns a sensible, nonzero shift" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    trial = LatticeMC.build_rhf_trial(mi, 2, 2)
+    Ls = LatticeMC.cholesky_decompose_eri(mi.h2e; threshold=1e-8)
+    fbar = LatticeMC.force_bias_shift(trial, Ls, 0.01)
+    @test length(fbar) == length(Ls)
+    @test all(isfinite, fbar)
+    @test maximum(abs.(fbar)) > 1e-3   # not a no-op-sized shift
+end
+
+# --- run_afqmc_ab_initio(...; force_bias=true) is a variance-reduction
+# option, not a bias-reduction one (theory doc section 7.1) -- it must still
+# agree with FCI within the same kind of tolerance as the default, not
+# necessarily better. No strict variance-must-decrease assertion here: the
+# measured effect is modest (~7%) and single-seed statistical comparisons of
+# error bars are noisy: making that assertion actually run in a test would
+# be flaky, not a meaningful correctness check. ---
+@testset "run_afqmc_ab_initio(force_bias=true) is correct on H2" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=2)
+    trial = LatticeMC.build_rhf_trial(mi, 1, 1)
+    e_fci = ab_initio_fci_ground_state_energy(mi.h1e, mi.h2e, 1, 1; E_nuc=mi.E_nuc)
+    result = LatticeMC.run_afqmc_ab_initio(mi, trial, 1, 1; dtau=0.01, num_walkers=300,
+                                            num_steps=2000, equilibration_steps=500,
+                                            stabilize_every=5, pop_control_every=10, force_bias=true)
+    @test isapprox(result.energy_mean, e_fci; atol=0.03)
+end
+
 # --- stochastic AFQMC vs exact diagonalization. H2 (essentially single-
 # reference at these bond lengths) is a tight-tolerance correctness check;
 # H4 with the plain RHF trial and Tier-1 (no force-bias) sampling is a much

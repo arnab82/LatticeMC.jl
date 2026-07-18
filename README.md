@@ -88,17 +88,24 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
 - Complex walkers and the general complex phaseless gate (`w *= |I|*max(0,
   cos(arg I))`), of which the Hubbard side's real sign-flip gate is the
   real/discrete special case.
+- Optional force-bias (mean-field-shifted) sampling
+  (`run_afqmc_ab_initio(...; force_bias=true)`) for a modest (~7% measured)
+  variance reduction. Off by default -- it's a genuine but small effect, and
+  it does *not* fix the equilibrium-H4 accuracy gap below (that was the
+  natural hypothesis; measured and ruled out, see the theory doc §7.1).
 
-**Read before trusting a result**: this is deliberately a "Tier 1"
-implementation (no force-bias/mean-field-shifted sampling, direct-tensor not
-Cholesky-vector local energy) -- correct, but its accuracy is strongly
+**Read before trusting a result**: correct, but accuracy is strongly
 trial-quality-dependent, more so than you'd guess from the code. Measured on
-H4: near equilibrium, ~11% of the correlation energy is recovered (a Tier-1
-sampling limitation, not a trial problem -- the UHF trial doesn't help here,
-it correctly collapses to RHF); stretched, the plain RHF trial actually gets
-*worse than mean-field* (RHF's own dissociation-catastrophe instability
-poisoning the trial) while the UHF trial recovers ~75%. H2, which stays
-single-reference throughout, recovers ~93% with just the RHF trial. See
+H4: near equilibrium, ~11% of the correlation energy is recovered -- this
+is the phaseless approximation's own asymptotic bias for this trial (not a
+sampling-variance issue: doesn't respond to more walkers, more steps,
+smaller `dtau`, force bias, *or* the UHF trial, which correctly collapses
+back to RHF there since RHF is already the locally optimal single
+determinant). Stretched, the plain RHF trial actually gets *worse than
+mean-field* (RHF's own dissociation-catastrophe instability poisoning the
+trial) while the UHF trial recovers ~75%, a real fix for that different
+failure mode. H2, which stays single-reference throughout, recovers ~93%
+with just the RHF trial. See
 [`docs/afqmc_ab_initio_theory.md`](docs/afqmc_ab_initio_theory.md) sections
 6-7 for the full account (including the cross-validation that ruled out a
 bug) before drawing conclusions on a new system.

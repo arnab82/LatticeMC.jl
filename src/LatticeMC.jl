@@ -46,6 +46,7 @@ export HubbardLattice, build_hubbard_chain, build_hubbard_square,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
        propagate_step_ab_initio!,
+       force_bias_shift, propagate_step_ab_initio_force_bias!,
        population_control_ab_initio!,
        run_afqmc_ab_initio
 
@@ -75,6 +76,7 @@ export MolecularIntegrals, read_fcidump,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
        propagate_step_ab_initio!,
+       force_bias_shift, propagate_step_ab_initio_force_bias!,
        population_control_ab_initio!,
        run_afqmc_ab_initio
 

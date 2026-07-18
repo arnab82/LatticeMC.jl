@@ -83,16 +83,16 @@ $$w \mathrel{*}= |I(x)|\cdot\max(0,\cos(\arg I(x)))$$
 
 ## 6. Tier 1 scope: what's simplified, and what that costs (measured)
 
-Two things are deliberately simplified relative to production codes, and
-their cost was measured directly (not just estimated) during development:
+One thing is deliberately simplified relative to production codes, and its
+cost was measured directly (not just estimated) during development:
 
-- **No force bias / mean-field shift.** $x$ is sampled from $N(0,I)$
-  directly, not shifted toward the walker's own mixed density (the standard
-  variance-reduction refinement). This is mathematically unbiased on its
-  own (any importance-sampling shift is, given a correctly-computed
-  reweighting factor) but increases variance.
 - **Direct-tensor local energy**, not Cholesky-vector-based: fine at the
   `Ns` ~ 4-8 scale this targets, `O(Ns^4)` per measurement.
+
+(A force-bias/mean-field-shifted sampling option *is* available --
+`run_afqmc_ab_initio(...; force_bias=true)` -- off by default. See §7.1 for
+why: it's a real, modest variance-reduction technique, not the bias fix an
+earlier version of this document mistakenly suggested it would be.)
 
 **What this costs in practice**, measured on H4 (4 hydrogens, STO-3G,
 bond=1.4 bohr) vs. H2 at the same bond length, both with a plain RHF trial:
@@ -109,13 +109,22 @@ Cholesky reconstruction, RHF's variational bound and dissociation-catastrophe
 trend, the mixed-estimator formula against an explicit many-body CI-vector
 calculation for a generic complex walker, and the core multivariate Gaussian
 identity against direct Monte Carlo for non-commuting Cholesky vectors) —
-all matched to near machine precision. Adding a hand-rolled mean-field force
-bias to the propagator did *not* change the H4 result at all, which is
-itself informative: it confirms the gap is coming from the phaseless
-constraint's inherent information loss (discarding the phase of the
-importance ratio every step) compounding over many steps for a system whose
-true ground state isn't well-aligned with a single RHF determinant, not from
-sampling variance that force-bias would fix.
+all matched to near machine precision.
+
+**On force bias specifically** (§7.1 has the full investigation, including
+an implementation pitfall worth knowing about): a correctly-implemented
+mean-field force bias does not close this gap, confirmed by a statistically
+well-powered comparison and a direct mechanistic check of *why* it should
+help. It's a variance-reduction technique -- makes the stochastic estimator
+more efficient for a fixed accuracy target -- not a bias-reduction one. The
+H4-equilibrium gap is not a variance problem (it doesn't shrink with more
+walkers, more steps, smaller `dtau`, or force bias); it's the *asymptotic*
+($\tau\to\infty$) bias of the phaseless approximation itself for this
+specific (Hamiltonian, RHF trial) pair, set by how well the trial's phase/
+nodal structure tracks the true ground state's along the imaginary-time
+path. No refinement of the sampling scheme changes that -- only a
+qualitatively different trial (multi-determinant, not just a different
+single determinant) would.
 
 **Why H4 and not H2**: H2's two electrons in one bonding orbital are well
 described by a single RHF determinant even somewhat away from equilibrium
@@ -132,8 +141,9 @@ wrong for the equilibrium-bond-length H4 case specifically** -- at bond=1.4,
 UHF converges back to the exact RHF solution (zero spin polarization; RHF is
 already a locally stable, adequate single-reference description there), so
 the trial is unchanged and the AFQMC result doesn't move. The gap at that
-geometry really is what section 4's discussion says: the phaseless
-constraint's information loss compounding over the walk, not a bad trial.
+geometry is the asymptotic phaseless-approximation bias described just
+above -- not fixable by a better *single-determinant* trial search, since
+RHF already is the (locally) optimal single determinant there.
 
 Where UHF *does* help enormously is stretched H4, a different (and more
 classic) failure mode -- the standard RHF-to-UHF bond-dissociation
@@ -151,11 +161,9 @@ AFQMC estimate landed *above* RHF -- a real failure mode of the plain-RHF
 trial at a geometry it doesn't describe qualitatively correctly, not just a
 quantitatively poor one.) So: two genuinely different problems share the
 same symptom ("H4 AFQMC is inaccurate") but need different fixes -- trial
-symmetry breaking fixes the dissociation-instability case, not the
-equilibrium case. The remaining, still-unfixed piece (a properly
-self-consistent mean-field force bias, not the single hand-rolled variant
-tried during development) is what would address the equilibrium gap; still
-real future work.
+symmetry breaking fixes the dissociation-instability case; the equilibrium
+case needs a qualitatively different (multi-determinant) trial, not a
+sampling refinement (§7.1).
 
 ## 7. Unrestricted Hartree-Fock trial (`build_uhf_trial_ab_initio`)
 
@@ -179,3 +187,69 @@ seeded toward spin-up, even toward spin-down) -- simple because it only
 needs to handle the linear chains `build_h_chain_sto3g` produces; would need
 a proper geometry-aware coloring (like Hubbard's `bipartite_coloring`, which
 works from the lattice graph) for a future non-chain ab initio builder.
+
+### 7.1. Force bias (`force_bias=true`): a variance fix, not a bias fix
+
+The natural next hypothesis after UHF (asked for explicitly, and worth
+recording in full since it took two attempts and overturned an earlier claim
+in this document): if UHF doesn't fix the equilibrium H4 gap, does a
+*properly self-consistent* mean-field force bias -- the standard variance-
+reduction technique real AFQMC codes use? Implemented per Cholesky vector as
+the textbook prescription: shift the sampled Gaussian field by
+$\bar f_\gamma = -\sqrt{\Delta\tau}\,\mathrm{Re}\,\mathrm{tr}(L^\gamma G)$,
+and correct the weight by the exact Radon-Nikodym factor for sampling from
+the shifted Gaussian instead of the standard one,
+$\exp(-\tfrac12|\bar f|^2 - \bar f\cdot\xi)$ ($\xi = x-\bar f$, the realized
+fluctuation) -- this factor is derived from an exact change-of-variables
+identity, so it introduces no approximation of its own for *any* choice of
+$\bar f$; only the choice of $\bar f$ affects variance, never correctness.
+
+**Attempt 1: walker-adaptive shift** ($G$ = each walker's own mixed Green's
+function, re-evaluated every step). Result: no improvement, and by two
+independent measurements. Mechanistically, does the shift reduce the
+per-step phase decorrelation ($\cos(\arg I(x))$, the quantity the phaseless
+gate consumes)? No: mean $\cos\theta$ per step was $0.958$ unbiased vs.
+$0.955$ shifted (5000-sample, matched seed) -- statistically distinguishable
+but in the *wrong* direction. Directly, a well-powered AFQMC run (500
+walkers, 4000 steps, matched seeds) gave gap-from-FCI $0.0375\pm0.0002$ Ha
+unbiased vs. $0.0365\pm0.0007$ Ha shifted (no significant bias change --
+both comfortably within about $1\sigma$ of each other) -- and the error bar
+was over $3\times$ *larger* with the shift, the opposite of what a
+variance-reduction technique should do.
+
+**Why attempt 1 backfired**: re-evaluating $\bar f$ from each walker's own
+(noisy, increasingly decorrelated-from-trial) state every step makes the
+shift itself a fluctuating quantity, correlated with the walker's own noise
+-- adding a new noise source rather than removing one.
+
+**Attempt 2: static shift**, $\bar f$ computed once from the *trial's* own
+density (`force_bias_shift`, evaluated before the walk starts, reused every
+step for every walker) rather than adaptively per walker per step. This
+fixes the variance problem: measured error bar (same system, dtau, walker/
+step count, one seed, all three variants run back to back for a fair
+comparison) $\pm0.000318$ unbiased vs. $\pm0.000296$ static-shifted -- a
+modest (~7%) but genuine reduction, not a regression. The bias is unchanged
+across all three ($0.0370$ unbiased / $0.0377$ static-shifted / $0.0374$
+walker-adaptive, all statistically consistent with each other given their
+error bars) -- consistent with, and confirming, the conclusion below.
+
+**Conclusion, and why it makes sense in hindsight**: force bias reduces the
+*variance* of the stochastic estimator for a fixed sample size -- it does
+not change the *asymptotic* ($\tau\to\infty$, infinite-sample) bias of the
+phaseless approximation itself, which is fixed by the trial's phase/nodal
+structure relative to the true ground state along the imaginary-time path.
+The equilibrium H4 gap doesn't respond to more walkers, more steps, smaller
+`dtau`, *or* either force-bias variant, precisely because none of those are
+variance knobs for *this* quantity. The only lever that changes the
+phaseless bias itself is the trial's *qualitative* structure -- a
+multi-determinant trial, not a better single determinant (UHF already
+established RHF is the locally optimal single determinant at this
+geometry) -- genuine future work, and a materially bigger undertaking than
+either of the trial-wavefunction additions made so far.
+
+**What shipped**: the static-shift version, as `run_afqmc_ab_initio(...;
+force_bias=true)` / `propagate_step_ab_initio_force_bias!` +
+`force_bias_shift` in `propagator.jl`. Off by default (`force_bias=false`)
+since the effect is modest and it costs one extra Green's-function
+evaluation up front; worth turning on for production runs where every bit
+of variance reduction helps, not worth it for a quick check.

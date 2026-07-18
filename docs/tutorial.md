@@ -107,20 +107,27 @@ that instability hasn't kicked in, e.g. near equilibrium):
 uhf_trial = LatticeMC.build_uhf_trial_ab_initio(mi, 1, 1)
 ```
 
+There's also an optional force-bias (variance-reduction) mode:
+
+```julia
+result = LatticeMC.run_afqmc_ab_initio(mi, trial, 1, 1; force_bias=true)
+```
+
 **Read this before trusting a result on a new molecule**: ab initio AFQMC's
 accuracy here depends heavily on how well the trial describes your system,
 in two somewhat different ways. Measured on H4: near equilibrium, ~11% of
-the correlation energy is recovered with either trial (the UHF trial
-correctly collapses to RHF there -- that gap is a Tier-1 sampling
-limitation, not a trial problem); stretched, the plain RHF trial actually
-does *worse than mean-field* while the UHF trial recovers ~75%. H2, which
-stays single-reference throughout, recovers ~93% with just RHF. None of this
-is a bug -- it's measured and explained in
-[`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md) sections 6-7. Read
-it before drawing conclusions from a result on a system you suspect has real
-multi-reference character. `example/afqmc_h4_example.jl` shows the
-equilibrium case directly (reports the recovered-correlation percentage,
-doesn't hide it).
+the correlation energy is recovered no matter what you do here (UHF
+collapses back to RHF there, and force bias doesn't move it either -- this
+is the phaseless approximation's own asymptotic bias for this trial, not a
+sampling-variance problem); stretched, the plain RHF trial actually does
+*worse than mean-field* while the UHF trial recovers ~75%, a real fix for
+that different failure mode. H2, which stays single-reference throughout,
+recovers ~93% with just RHF. None of this is a bug -- it's measured and
+explained in [`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md)
+sections 6-7. Read it before drawing conclusions from a result on a system
+you suspect has real multi-reference character. `example/afqmc_h4_example.jl`
+shows the equilibrium case directly (reports the recovered-correlation
+percentage, doesn't hide it).
 
 For small molecules, `test/ab_initio_fci_reference.jl`'s
 `ab_initio_fci_ground_state_energy` gives you an exact comparison point the
