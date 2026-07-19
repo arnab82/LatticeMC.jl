@@ -11,6 +11,13 @@ Modules = [LatticeMC.Ising]
 Order = [:function, :type]
 ```
 
+## Heisenberg (SSE)
+
+```@autodocs
+Modules = [LatticeMC.Heisenberg]
+Order = [:function, :type]
+```
+
 ## AFQMC (Hubbard)
 
 ```@autodocs

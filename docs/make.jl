@@ -12,6 +12,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Tutorial" => "tutorial.md",
+        "Heisenberg (SSE QMC)" => "heisenberg.md",
         "AFQMC theory (Hubbard)" => "afqmc_theory.md",
         "AFQMC algorithm (pseudocode)" => "afqmc_algorithm.md",
         "Ab initio AFQMC theory" => "afqmc_ab_initio_theory.md",

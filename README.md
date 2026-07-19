@@ -10,11 +10,18 @@
 ## Overview
 
 A Julia package for Monte Carlo simulation in statistical mechanics and
-condensed matter/quantum chemistry, organized as three submodules:
+condensed matter/quantum chemistry, organized as several submodules:
 
 - **`LatticeMC.Ising`** -- classical Metropolis Monte Carlo for the 2D Ising
   model: spin configurations, magnetization, energy, heat capacity, and
   related thermodynamic properties.
+- **`LatticeMC.Heisenberg`** -- Stochastic Series Expansion (SSE) QMC for the
+  S=1/2 antiferromagnetic Heisenberg model on bipartite lattices. Sign-
+  problem-free and exact (no determinants/auxiliary fields -- it samples the
+  power series of `exp(-beta H)`), so an 8x8 = 64-site ground state (a 2^64
+  Hilbert space, hopeless for exact diagonalization) is a few-second run.
+  Reproduces the known square-lattice energies (4x4 -0.7015, 6x6 -0.6790,
+  8x8 -0.6735 J/site) essentially exactly.
 - **`LatticeMC.AFQMC`** -- phaseless (constrained-path) Auxiliary-Field
   Quantum Monte Carlo for the fermionic Hubbard model on 1D chains and 2D
   square lattices: imaginary-time projection of a population of
@@ -28,12 +35,14 @@ condensed matter/quantum chemistry, organized as three submodules:
   Hartree-Fock trial, and a self-contained STO-3G integral engine for
   hydrogen chains (no external quantum chemistry dependency).
 
-All three re-export their public API at the top level, so
-`LatticeMC.IsingModel(...)`, `LatticeMC.run_afqmc(...)`, and
-`LatticeMC.run_afqmc_ab_initio(...)` all work directly.
+All submodules re-export their public API at the top level, so
+`LatticeMC.IsingModel(...)`, `LatticeMC.run_sse(...)`,
+`LatticeMC.run_afqmc(...)`, and `LatticeMC.run_afqmc_ab_initio(...)` all work
+directly.
 
-**New here?** Start with [`docs/src/tutorial.md`](docs/src/tutorial.md) -- a
-hands-on walkthrough of all three methods -- rather than this README.
+**New here?** Start with the [documentation site](https://arnab82.github.io/LatticeMC.jl/)
+or [`docs/src/tutorial.md`](docs/src/tutorial.md) -- a hands-on walkthrough --
+rather than this README.
 
 ## Features
 
@@ -153,6 +162,9 @@ source pages:
 ## Examples
 
 - `example/example.jl` -- classical Ising Monte Carlo (original example).
+- `example/heisenberg_sse_example.jl` -- SSE ground-state energy of the 2D
+  Heisenberg model for LxL lattices up to 8x8, with finite-size scaling
+  toward the thermodynamic limit.
 - `example/afqmc_example.jl` -- AFQMC energy trace on a Hubbard chain.
 - `example/afqmc_phase_diagram.jl` -- ground-state energy vs `U/t` for a
   small chain, AFQMC overlaid on an exact-diagonalization reference.
@@ -202,6 +214,11 @@ using LatticeMC
 # Ising
 lattice = LatticeMC.IsingModel(50, 1.0, true)
 e = LatticeMC.energy_manual(lattice)
+
+# Heisenberg SSE (8x8 antiferromagnet ground state, ~seconds)
+lat = LatticeMC.build_heisenberg_square(8, 8; pbc=true)
+r = LatticeMC.run_sse(lat; beta=32.0)
+println(r.energy_per_site)   # ~ -0.6735 J
 
 # AFQMC (4-site Hubbard chain, open boundaries, U/t = 4)
 h = LatticeMC.build_hubbard_chain(4, 1.0, 4.0; pbc=false)

@@ -101,7 +101,20 @@ using .AbInitio
 
 end # module AFQMC
 
+module Heisenberg
+
+using Random
+
+export HeisenbergLattice, build_heisenberg_chain, build_heisenberg_square,
+       nbonds, is_bipartite, run_sse
+
+include("heisenberg/lattice.jl")
+include("heisenberg/sse.jl")
+
+end # module Heisenberg
+
 using .Ising
 using .AFQMC
+using .Heisenberg
 
 end # module LatticeMC

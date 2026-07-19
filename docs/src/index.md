@@ -1,10 +1,13 @@
 # LatticeMC.jl
 
 A Julia package for Monte Carlo simulation in statistical mechanics and
-condensed matter / quantum chemistry, organized as three submodules:
+condensed matter / quantum chemistry, organized as several submodules:
 
 - **`LatticeMC.Ising`** — classical Metropolis Monte Carlo for the 2D Ising
   model.
+- **`LatticeMC.Heisenberg`** — Stochastic Series Expansion (SSE) QMC for the
+  S=1/2 antiferromagnetic Heisenberg model on bipartite lattices. Sign-problem-
+  free and exact, so an 8×8 (64-site) ground state is a few-second calculation.
 - **`LatticeMC.AFQMC`** — phaseless (constrained-path) Auxiliary-Field
   Quantum Monte Carlo for the fermionic Hubbard model on 1D chains and 2D
   square lattices, with rank-1 Green's-function fast updates, population

@@ -14,4 +14,7 @@ using LatticeMC
     @testset verbose = true "AFQMC ab initio" begin
         include("./ab_initio.jl")
     end
+    @testset verbose = true "Heisenberg SSE" begin
+        include("./heisenberg.jl")
+    end
 end
