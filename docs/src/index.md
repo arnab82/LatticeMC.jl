@@ -8,6 +8,10 @@ condensed matter / quantum chemistry, organized as several submodules:
 - **`LatticeMC.Heisenberg`** — Stochastic Series Expansion (SSE) QMC for the
   S=1/2 antiferromagnetic Heisenberg model on bipartite lattices. Sign-problem-
   free and exact, so an 8×8 (64-site) ground state is a few-second calculation.
+- **`LatticeMC.DQMC`** — determinant (BSS finite-temperature auxiliary-field)
+  QMC for the half-filled Hubbard model. Sign-problem-free at the particle-
+  hole-symmetric point, so it gives the *exact* half-filled ground state
+  (only Trotter + statistical error) where the projector AFQMC is biased.
 - **`LatticeMC.AFQMC`** — phaseless (constrained-path) Auxiliary-Field
   Quantum Monte Carlo for the fermionic Hubbard model on 1D chains and 2D
   square lattices, with rank-1 Green's-function fast updates, population

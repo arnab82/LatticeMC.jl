@@ -31,3 +31,10 @@ Order = [:function, :type]
 Modules = [LatticeMC.AFQMC.AbInitio]
 Order = [:function, :type]
 ```
+
+## Determinant QMC (Hubbard)
+
+```@autodocs
+Modules = [LatticeMC.DQMC]
+Order = [:function, :type]
+```

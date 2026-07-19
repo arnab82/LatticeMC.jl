@@ -16,6 +16,7 @@ makedocs(;
         "AFQMC theory (Hubbard)" => "afqmc_theory.md",
         "AFQMC algorithm (pseudocode)" => "afqmc_algorithm.md",
         "Ab initio AFQMC theory" => "afqmc_ab_initio_theory.md",
+        "Determinant QMC (Hubbard)" => "dqmc.md",
         "Implementation notes" => "afqmc_implementation.md",
         "API reference" => "api.md",
     ],

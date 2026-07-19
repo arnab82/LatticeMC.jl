@@ -114,8 +114,20 @@ include("heisenberg/sse.jl")
 
 end # module Heisenberg
 
+module DQMC
+
+using LinearAlgebra
+using Random
+
+export run_dqmc, stable_greens, dqmc_energy
+
+include("dqmc/dqmc.jl")
+
+end # module DQMC
+
 using .Ising
 using .AFQMC
 using .Heisenberg
+using .DQMC
 
 end # module LatticeMC

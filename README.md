@@ -34,6 +34,12 @@ condensed matter/quantum chemistry, organized as several submodules:
   two-electron tensor, a continuous Hubbard-Stratonovich transform, a
   Hartree-Fock trial, and a self-contained STO-3G integral engine for
   hydrogen chains (no external quantum chemistry dependency).
+- **`LatticeMC.DQMC`** -- determinant (BSS finite-temperature auxiliary-field)
+  QMC for the half-filled Hubbard model, sign-problem-free at the particle-
+  hole-symmetric point. This is the *exact* method for half filling (only
+  Trotter + statistical error): on 6x6 U/t=4 it gives E/site ~ -0.86 with
+  zero negative-weight moves, where the projector AFQMC is either constrained-
+  path-biased (-0.833) or hits a sign problem (free projection, mean_sign~0.3).
 
 All submodules re-export their public API at the top level, so
 `LatticeMC.IsingModel(...)`, `LatticeMC.run_sse(...)`,
@@ -165,6 +171,8 @@ source pages:
 - `example/heisenberg_sse_example.jl` -- SSE ground-state energy of the 2D
   Heisenberg model for LxL lattices up to 8x8, with finite-size scaling
   toward the thermodynamic limit.
+- `example/dqmc_hubbard_example.jl` -- sign-problem-free determinant QMC for
+  the half-filled 6x6 Hubbard model, with a dtau -> 0 Trotter extrapolation.
 - `example/afqmc_example.jl` -- AFQMC energy trace on a Hubbard chain.
 - `example/afqmc_phase_diagram.jl` -- ground-state energy vs `U/t` for a
   small chain, AFQMC overlaid on an exact-diagonalization reference.
