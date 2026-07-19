@@ -162,7 +162,28 @@ valid).
 the configured cadences reorthonormalize (`stabilize_every`) and
 population-control (`pop_control_every`), then record the mixed-estimator
 energy once past `equilibration_steps`. Returns a named tuple
-`(energy_trace, energy_mean, energy_err, walkers)`.
+`(energy_trace, energy_mean, energy_err, mean_sign, mean_sign_err, walkers)`.
+
+**`constrained` keyword (default `true`).** `true` is the phaseless /
+constrained-path algorithm above. `false` selects *free projection*
+(`propagate_step_free!` + `population_control_signed!`): the field is sampled
+uniformly (not trial-guided) and walker weights carry a sign, so the method
+is exact/unbiased -- but only *usable* while the mean sign stays near 1.
+
+A cautionary note worth internalizing (it cost a wrong assumption to learn):
+this zero-temperature projector free projection is **not** automatically
+sign-problem-free at half filling. The familiar "half-filled bipartite Hubbard
+is sign-free" theorem is about *finite-temperature determinant QMC* (weight =
+det² ≥ 0), a different algorithm. Here the sign of `⟨ψ_T|φ⟩` decays with
+projection time: it stays exactly 1 for small clusters (a few sites -- where
+free projection is genuinely exact and is tested against ED in
+`test/afqmc.jl`), but a 6×6 half-filled Hubbard already shows a real sign
+problem (`mean_sign ≈ 0.3`), where the free-projection energy is unreliable.
+Which is exactly why `run_afqmc` returns `mean_sign` -- treat a
+free-projection energy as meaningful only while that stays well away from 0.
+Also note the constrained-path *bias* is often dominated by *trial quality*:
+for small half-filled chains the paramagnetic `build_trial_wavefunction` is
+near-exact while `build_uhf_trial` is worse; at 6×6 it's the other way round.
 
 `block_average` does simple fixed-block blocking: split the trace into
 `num_blocks` contiguous chunks, treat block means as independent samples,

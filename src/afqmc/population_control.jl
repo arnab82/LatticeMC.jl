@@ -33,3 +33,42 @@ function population_control!(walkers::Vector{Walker})
 
     return walkers
 end
+
+# Signed comb resampling for free-projection walkers, whose weights can be
+# negative. Resamples proportional to |weight| (preserving the total absolute
+# weight) and each offspring inherits the sign of its parent -- the standard
+# reconfiguration for a signed walker population. Preserves the mean-sign
+# information (used by the free-projection estimator and diagnostics).
+function population_control_signed!(walkers::Vector{Walker})
+    Nw = length(walkers)
+    weights = [w.weight for w in walkers]
+    absw = abs.(weights)
+    total_abs = sum(absw)
+    total_abs <= 0.0 && return walkers
+
+    cumulative = cumsum(absw)
+    xi = rand()
+    new_phi_up = Vector{Matrix{Float64}}(undef, Nw)
+    new_phi_down = Vector{Matrix{Float64}}(undef, Nw)
+    new_sign = Vector{Float64}(undef, Nw)
+
+    idx = 1
+    for j in 1:Nw
+        target = (j - 1 + xi) / Nw * total_abs
+        while idx < Nw && cumulative[idx] < target
+            idx += 1
+        end
+        new_phi_up[j] = copy(walkers[idx].phi_up)
+        new_phi_down[j] = copy(walkers[idx].phi_down)
+        new_sign[j] = sign(weights[idx])
+    end
+
+    equal_mag = total_abs / Nw
+    for j in 1:Nw
+        walkers[j].phi_up = new_phi_up[j]
+        walkers[j].phi_down = new_phi_down[j]
+        walkers[j].weight = new_sign[j] * equal_mag
+    end
+
+    return walkers
+end

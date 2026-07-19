@@ -53,6 +53,26 @@ end
     end
 end
 
+# --- free projection (constrained=false). Unbiased and exact wherever the
+# sign stays healthy. Small half-filled Hubbard chains are genuinely sign-
+# problem-free for this projector method (mean sign == 1), so free projection
+# must match ED there -- a much tighter check than the constrained path's
+# loose tolerance above (which absorbs the constrained-path *bias*). NOTE:
+# unlike finite-T determinant QMC, this projector free projection is NOT
+# sign-problem-free at half filling in general -- a 6x6 half-filled Hubbard
+# already has a real sign problem; hence only small clusters are tested here,
+# and run_afqmc reports mean_sign so callers can tell when it's trustworthy. ---
+@testset "free projection is exact on a sign-free small Hubbard cluster" begin
+    Random.seed!(4242)
+    lattice = LatticeMC.build_hubbard_chain(4, 1.0, 4.0; pbc=false)
+    e_ed = ed_ground_state_energy(lattice, 2, 2)
+    trial = LatticeMC.build_trial_wavefunction(lattice, 2, 2)
+    r = LatticeMC.run_afqmc(lattice, trial, 2, 2; dtau=0.01, num_walkers=250,
+                            num_steps=3000, equilibration_steps=1000, constrained=false)
+    @test isapprox(r.mean_sign, 1.0; atol=1e-6)      # genuinely sign-free here
+    @test isapprox(r.energy_mean, e_ed; atol=0.06)   # and therefore exact (vs the loose CP tol)
+end
+
 @testset "AFQMC vs exact diagonalization: 6-site chain (OBC), half filling" begin
     for U in (0.0, 4.0)
         lattice = LatticeMC.build_hubbard_chain(6, 1.0, U; pbc=false)

@@ -92,3 +92,67 @@ function propagate_step!(walker::Walker, lattice::HubbardLattice, trial::TrialWa
 
     return walker
 end
+
+# Free-projection (unconstrained) version of propagate_step!. Two changes make
+# it genuinely free rather than a no-op:
+#   1. The auxiliary field is sampled UNIFORMLY (1/2 each), not force-biased
+#      toward the trial. Trial-guided (importance) sampling implicitly confines
+#      walkers to the trial's nodal cell -- it is the *real* constraint, more
+#      than the explicit gate -- so simply dropping the gate changes nothing.
+#      Unguided sampling lets walkers cross nodes.
+#   2. The weight accumulates the *signed* per-field ratio `ratio_s` (with the
+#      1/2 from the operator identity cancelling the 1/2 sampling probability),
+#      so it can go negative -- the free-projection sign.
+# No constrained-path gate. The algorithm is exact (unbiased), but only
+# *practical* where the mean sign stays close to 1; otherwise it decays toward
+# zero with projection time and the estimate becomes noise. IMPORTANT: this
+# projector free projection is NOT sign-problem-free just because the system is
+# half-filled and bipartite -- that well-known result is for finite-temperature
+# determinant QMC (weight = det^2 >= 0), a different algorithm. Here the sign of
+# <psi_T|phi> genuinely decays: it stays 1 for small clusters (a few sites, so
+# free projection is exact and validated against ED there) but a 6x6 half-filled
+# Hubbard already shows a real sign problem (mean sign ~ 0.3). So use this only
+# on genuinely sign-problem-free / small cases, and always watch the mean sign
+# that run_afqmc(...; constrained=false) reports. Higher variance than the
+# constrained path (no importance guidance) even when sign-free.
+function propagate_step_free!(walker::Walker, lattice::HubbardLattice, trial::TrialWavefunction,
+                               expK_half::Matrix{Float64}, gamma::Float64, dtau::Float64)
+    walker.weight == 0.0 && return walker
+
+    apply_one_body!(walker.phi_up, expK_half)
+    apply_one_body!(walker.phi_down, expK_half)
+
+    G_up = greens_function(walker.phi_up, trial.phi_up)
+    G_down = greens_function(walker.phi_down, trial.phi_down)
+
+    charge_factor = exp(-dtau * lattice.U / 2)
+    gamma_up_plus = charge_factor * exp(gamma)
+    gamma_down_plus = charge_factor * exp(-gamma)
+    gamma_up_minus = gamma_down_plus
+    gamma_down_minus = gamma_up_plus
+
+    for i in 1:lattice.Ns
+        if rand() < 0.5
+            R_up = local_update_ratio(G_up, i, gamma_up_plus)
+            R_down = local_update_ratio(G_down, i, gamma_down_plus)
+            walker.phi_up[i, :] .*= gamma_up_plus
+            walker.phi_down[i, :] .*= gamma_down_plus
+            rank1_update_greens_function!(G_up, i, gamma_up_plus, R_up)
+            rank1_update_greens_function!(G_down, i, gamma_down_plus, R_down)
+            walker.weight *= R_up * R_down
+        else
+            R_up = local_update_ratio(G_up, i, gamma_up_minus)
+            R_down = local_update_ratio(G_down, i, gamma_down_minus)
+            walker.phi_up[i, :] .*= gamma_up_minus
+            walker.phi_down[i, :] .*= gamma_down_minus
+            rank1_update_greens_function!(G_up, i, gamma_up_minus, R_up)
+            rank1_update_greens_function!(G_down, i, gamma_down_minus, R_down)
+            walker.weight *= R_up * R_down
+        end
+    end
+
+    apply_one_body!(walker.phi_up, expK_half)
+    apply_one_body!(walker.phi_down, expK_half)
+
+    return walker
+end
