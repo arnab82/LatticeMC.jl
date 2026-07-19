@@ -210,11 +210,16 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   $t\to0$ constantly for a chain of atoms.
 - **`cholesky.jl`** -- `cholesky_decompose_eri` (pivoted Cholesky, theory
   §3) and `modified_one_body` (the $h1e^{\rm mod}$ exchange correction).
-- **`rhf_trial.jl`** -- `AbInitioTrial` (the complex trial-wavefunction
-  struct, defined here since this is its first use site), `rhf_scf` (returns
-  orbitals + total energy, used directly in tests for the variational-bound
-  check), `build_rhf_trial` (wraps `rhf_scf`, returns the `AbInitioTrial`).
-  Closed-shell only (`Nup == Ndown`, throws otherwise).
+- **`rhf_trial.jl`** -- `AbstractAbInitioTrial` (the common supertype the
+  propagator/driver are written against, so single- and multi-determinant
+  trials are interchangeable), `AbInitioTrial` (the single-determinant
+  struct), `rhf_scf` (returns the **full** `Ns x Ns` MO coefficient matrix
+  plus total energy -- the full matrix, not just the occupied block, so it
+  doubles as the MO-basis transform that `build_casci_trial` needs;
+  `build_rhf_trial` slices `[:, 1:Nup]`), `build_rhf_trial`. Closed-shell
+  only (`Nup == Ndown`, throws otherwise). `reference_determinant(trial)` is
+  the uniform accessor the driver uses so it doesn't special-case the trial
+  type.
 - **`uhf_trial.jl`** -- `uhf_scf` / `build_uhf_trial_ab_initio`, the ab
   initio analogue of `uhf_trial.jl`'s Hubbard `build_uhf_trial`: separate
   `phi_up`/`phi_down` (unlike `rhf_trial.jl`'s shared orbitals), Fock
@@ -247,6 +252,33 @@ multiple-dispatch-across-modules ambiguity that sharing names like
   symmetry or sampling-variance problem (force bias doesn't fix it either,
   see §7.1 in the theory doc and the `propagator.jl` section below) -- see
   the theory doc for the distinction.
+- **`multidet_trial.jl`** -- `MultiDetTrial` (a `<: AbstractAbInitioTrial`,
+  so `run_afqmc_ab_initio` propagates it unchanged) and its
+  `overlap_ab_initio` / `local_energy_ab_initio` / `init_ab_initio_walkers`
+  methods. Theory §8: all three are overlap-weighted averages over the
+  determinants, so each reuses the single-determinant estimators per
+  determinant and combines them. The struct carries a single `ref_up`/
+  `ref_down` (the dominant CI determinant) used only to seed the walkers and
+  for the driver's size-check / default energy shift -- it is *not* part of
+  the trial expansion. Loaded after `walker.jl`+`estimators.jl` (it needs
+  `AbInitioWalker` and the single-det Green's/overlap functions), which is
+  why `init_ab_initio_walkers(::MultiDetTrial)` lives here, not in
+  `walker.jl`.
+- **`casci_trial.jl`** -- `determinant_matrix` (occupied-orbital list -> the
+  identity columns that represent a determinant *in the MO basis*),
+  `multidet_from_ci` (assemble a `MultiDetTrial` from external coefficients +
+  occupation lists, e.g. a PySCF CASSCF CI vector), `mo_transform` (the
+  4-index integral transform to a new orbital basis), and `build_casci_trial`
+  (the all-in-one: RHF -> transform to MO basis -> internal full-CI ->
+  top-`max_dets` truncation). **The MO basis is not optional here** (theory
+  §8): a determinant truncation is only well-behaved in the MO basis where
+  the HF determinant dominates; truncating a raw-AO-basis CI gives unphysical
+  below-FCI energies (found the hard way -- the *full* expansion works in any
+  basis, so the bug hides until you truncate). `build_casci_trial` therefore
+  returns `(trial, mi_mo, e_ci)` and **you must run AFQMC with the returned
+  `mi_mo`**, not the original integrals -- trial and integrals have to share
+  a basis. Internal-CI size ceiling = exact diagonalization's; past that,
+  build the expansion with `multidet_from_ci` from an external CASSCF.
 - **`walker.jl`** -- `AbInitioWalker`, `init_ab_initio_walkers`,
   `orthonormalize_ab_initio!`. Complex QR; the "no weight compensation
   needed" argument from theory §10 is unchanged by working over $\mathbb{C}$

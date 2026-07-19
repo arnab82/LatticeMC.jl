@@ -40,8 +40,9 @@ export HubbardLattice, build_hubbard_chain, build_hubbard_square,
        MolecularIntegrals, read_fcidump,
        build_h_chain_sto3g,
        cholesky_decompose_eri, modified_one_body,
-       AbInitioTrial, build_rhf_trial, rhf_scf,
+       AbstractAbInitioTrial, AbInitioTrial, build_rhf_trial, rhf_scf,
        build_uhf_trial_ab_initio, uhf_scf,
+       MultiDetTrial, multidet_from_ci, build_casci_trial, determinant_matrix, mo_transform,
        AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
@@ -70,8 +71,9 @@ import ..block_average
 export MolecularIntegrals, read_fcidump,
        build_h_chain_sto3g,
        cholesky_decompose_eri, modified_one_body,
-       AbInitioTrial, build_rhf_trial, rhf_scf,
+       AbstractAbInitioTrial, AbInitioTrial, build_rhf_trial, rhf_scf,
        build_uhf_trial_ab_initio, uhf_scf,
+       MultiDetTrial, multidet_from_ci, build_casci_trial, determinant_matrix, mo_transform,
        AbInitioWalker, init_ab_initio_walkers, orthonormalize_ab_initio!,
        greens_function_ab_initio, overlap_ab_initio, walker_overlap_ab_initio,
        local_energy_ab_initio, mixed_energy_estimator_ab_initio,
@@ -87,6 +89,8 @@ include("afqmc/ab_initio/rhf_trial.jl")
 include("afqmc/ab_initio/uhf_trial.jl")
 include("afqmc/ab_initio/walker.jl")
 include("afqmc/ab_initio/estimators.jl")
+include("afqmc/ab_initio/multidet_trial.jl")
+include("afqmc/ab_initio/casci_trial.jl")
 include("afqmc/ab_initio/propagator.jl")
 include("afqmc/ab_initio/population_control.jl")
 include("afqmc/ab_initio/driver.jl")

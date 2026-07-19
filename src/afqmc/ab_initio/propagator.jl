@@ -16,7 +16,7 @@ apply_one_body_ab_initio!(phi::Matrix{ComplexF64}, expH1_half::Matrix{Float64}) 
 # here is carried entirely by the phaseless gate below (the complex
 # generalization of the real sign-flip gate used for Hubbard, theory doc
 # section 8): w *= |I(x)| * max(0, cos(arg(I(x)))), I(x) = overlap_new/overlap_ref.
-function propagate_step_ab_initio!(walker::AbInitioWalker, mi::MolecularIntegrals, trial::AbInitioTrial,
+function propagate_step_ab_initio!(walker::AbInitioWalker, mi::MolecularIntegrals, trial::AbstractAbInitioTrial,
                                     expH1_half::Matrix{Float64}, Ls::Vector{Matrix{Float64}}, dtau::Float64)
     walker.weight == 0.0 && return walker
 

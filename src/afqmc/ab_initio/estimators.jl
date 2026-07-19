@@ -46,7 +46,7 @@ function local_energy_ab_initio(mi::MolecularIntegrals, walker::AbInitioWalker, 
     return mi.E_nuc + e1 + e2
 end
 
-function mixed_energy_estimator_ab_initio(mi::MolecularIntegrals, walkers::Vector{AbInitioWalker}, trial::AbInitioTrial)
+function mixed_energy_estimator_ab_initio(mi::MolecularIntegrals, walkers::Vector{AbInitioWalker}, trial::AbstractAbInitioTrial)
     numerator = zero(ComplexF64)
     denominator = 0.0
     for walker in walkers

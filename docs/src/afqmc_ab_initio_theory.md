@@ -253,3 +253,82 @@ force_bias=true)` / `propagate_step_ab_initio_force_bias!` +
 since the effect is modest and it costs one extra Green's-function
 evaluation up front; worth turning on for production runs where every bit
 of variance reduction helps, not worth it for a quick check.
+
+## 8. Multi-determinant trial: the actual fix for the phaseless bias
+
+§6 and §7.1 established that the equilibrium-H4 gap is the phaseless
+approximation's own asymptotic bias, fixed only by a *qualitatively* better
+trial — not a different single determinant (UHF), not better sampling (force
+bias). The lever that does work: a **multi-determinant trial**,
+
+$$|\psi_T\rangle = \sum_{i=1}^{K} c_i\,|D_i\rangle,\qquad |D_i\rangle = |D_i^\uparrow\rangle\otimes|D_i^\downarrow\rangle$$
+
+each $|D_i\rangle$ a Slater determinant (a pair of up/down orbital matrices),
+with complex coefficients $c_i$. In the limit where the expansion is the
+exact ground state, the phaseless bias vanishes entirely; truncated, it
+systematically interpolates between a single determinant and exact.
+
+**Everything the AFQMC needs is an overlap-weighted average over the
+determinants.** Writing $O_i = \langle D_i|\phi\rangle = \det(D_i^{\uparrow\dagger}\phi^\uparrow)\det(D_i^{\downarrow\dagger}\phi^\downarrow)$
+for the $i$-th determinant's overlap with a walker $|\phi\rangle$:
+
+- **Overlap**: $\langle\psi_T|\phi\rangle = \sum_i c_i^*\,O_i$ — just a sum of
+  single-determinant Thouless overlaps (§5), each a product of two dets.
+- **Mixed Green's function**: $G^\sigma = \big(\sum_i c_i^* O_i\,G_i^\sigma\big)\big/\big(\sum_i c_i^* O_i\big)$,
+  where $G_i^\sigma$ is the *single*-determinant Green's function between
+  $D_i$ and $\phi$ — the overlap-weighted average of the per-determinant
+  Green's functions.
+- **Mixed local energy**: $E_{\rm loc} = \big(\sum_i c_i^* O_i\,E_i\big)\big/\big(\sum_i c_i^* O_i\big)$,
+  where $E_i$ is the single-determinant mixed local energy (§6) computed with
+  $G_i$. This is exact because $\langle\psi_T|H|\phi\rangle = \sum_i c_i^*\langle D_i|H|\phi\rangle = \sum_i c_i^* O_i E_i$.
+
+So the whole implementation is: run the existing single-determinant machinery
+once per determinant, and combine by overlap-weighting. Cost is $O(K)\times$
+the single-determinant cost — cheap for the modest $K$ (tens of determinants)
+that a truncated CI needs.
+
+### Where the determinants come from, and the one basis subtlety that bites
+
+The natural source is a (truncated) CI / CASSCF expansion. The key practical
+point, learned the hard way in development: **the truncation is only
+well-behaved in the MO basis.** In the RHF molecular-orbital basis, a
+determinant is simply a choice of occupied orbitals (its orbital matrix is
+the corresponding columns of the identity), and the CI vector is *dominated*
+by the HF determinant ($|c_0|\approx0.99$ for H4), so keeping the top-$K$
+determinants is a sensible approximation. In a raw AO basis the CI vector has
+no such dominant determinant; a truncated AO-basis expansion is a *poor,
+ill-behaved* trial that gives unphysical (below-FCI) phaseless energies. A
+*full* expansion is basis-independent and works either way — which is exactly
+why the bug only shows up on truncation. `build_casci_trial` therefore always
+transforms to the RHF MO basis internally and returns the MO-basis integrals
+to run AFQMC with (trial and integrals must share a basis).
+
+### Measured: this is what closes the gap
+
+On the equilibrium-H4 case that defeated UHF and force bias, adding
+determinants monotonically closes the phaseless gap (`dtau=0.01`, correlation
+energy recovered):
+
+| trial | corr. recovered |
+|---|---|
+| top-1 determinant (= HF) | ~8% |
+| top-2 | ~21% |
+| top-5 | ~73% |
+| top-10 | ~92% |
+| full CI (36 dets) | exact (to ~1e-15) |
+
+The top-1 case reproduces the single-RHF-determinant limit from §6; the full
+expansion gives AFQMC = FCI to machine precision, which is the strongest
+possible end-to-end validation of the multi-determinant overlap / Green's-
+function / local-energy machinery (if any of those were wrong, the exact-
+ground-state trial would not give the exact energy).
+
+**What shipped**: `MultiDetTrial` (a drop-in `AbstractAbInitioTrial`, so the
+same `run_afqmc_ab_initio` propagates it), `build_casci_trial` (internal
+RHF + MO transform + full-CI solve + top-$K$ truncation, small systems only),
+and `multidet_from_ci` (assemble a trial from an externally-supplied
+expansion, e.g. a PySCF CASSCF CI vector, for systems past the internal-CI
+size ceiling). Force bias is not yet implemented for multi-determinant trials
+(it errors if requested). See
+[`afqmc_implementation.md`](afqmc_implementation.md) for the file/function
+map.

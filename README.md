@@ -87,6 +87,13 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
   for geometries where RHF stops being qualitatively adequate (the standard
   bond-dissociation instability) -- collapses back to RHF where that
   instability hasn't kicked in yet, so it's always safe to use.
+- **Multi-determinant / CASCI trials** (`build_casci_trial`,
+  `MultiDetTrial`, `multidet_from_ci`) -- the one knob that systematically
+  closes the phaseless-approximation accuracy gap: adding determinants drives
+  the result monotonically to FCI (on equilibrium H4: top-1 ~8%, top-5 ~73%,
+  top-10 ~92%, full expansion exact to ~1e-15). A full-FCI trial makes AFQMC
+  exact, the strongest end-to-end validation of the machinery. Built in the
+  RHF MO basis (required for a well-behaved truncation).
 - Complex walkers and the general complex phaseless gate (`w *= |I|*max(0,
   cos(arg I))`), of which the Hubbard side's real sign-flip gate is the
   real/discrete special case.
@@ -94,7 +101,8 @@ optimization (delayed updates, sparser K, GPU) not implemented here.
   (`run_afqmc_ab_initio(...; force_bias=true)`) for a modest (~7% measured)
   variance reduction. Off by default -- it's a genuine but small effect, and
   it does *not* fix the equilibrium-H4 accuracy gap below (that was the
-  natural hypothesis; measured and ruled out, see the theory doc §7.1).
+  natural hypothesis; measured and ruled out, see the theory doc §7.1 -- the
+  multi-determinant trial above is what fixes it).
 
 **Read before trusting a result**: correct, but accuracy is strongly
 trial-quality-dependent, more so than you'd guess from the code. Measured on

@@ -270,3 +270,72 @@ end
     @test abs(result_uhf.energy_mean - e_fci) < abs(result_rhf.energy_mean - e_fci) - 0.1
     @test isapprox(result_uhf.energy_mean, e_fci; atol=0.15)
 end
+
+# --- multi-determinant / CASCI trial. Several independent correctness
+# checks, from cheap+exact to the end-to-end point. ---
+
+# (i) build_casci_trial's full expansion must reproduce the exact CI (=FCI)
+# energy -- a deterministic check of the internal CI solve + MO transform,
+# against the independent AO-basis FCI reference (both are basis-invariant).
+@testset "CASCI full expansion reproduces the FCI energy" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    e_fci = ab_initio_fci_ground_state_energy(mi.h1e, mi.h2e, 2, 2; E_nuc=mi.E_nuc)
+    _, _, e_ci = LatticeMC.build_casci_trial(mi, 2, 2)
+    @test isapprox(e_ci, e_fci; atol=1e-9)
+end
+
+# (ii) determinant_matrix / multidet_from_ci basics.
+@testset "multi-determinant trial construction" begin
+    M = LatticeMC.determinant_matrix(4, [1, 3])
+    @test size(M) == (4, 2)
+    @test M[1, 1] == 1 && M[3, 2] == 1 && sum(abs.(M)) == 2
+
+    # a one-determinant MultiDetTrial equals the corresponding single-det
+    # trial for overlap purposes.
+    trial = LatticeMC.multidet_from_ci(4, [1.0], [[1, 2]], [[1, 2]])
+    @test length(trial.coeffs) == 1
+    @test size(trial.ref_up) == (4, 2)
+    @test_throws ArgumentError LatticeMC.MultiDetTrial(ComplexF64[], Matrix{ComplexF64}[], Matrix{ComplexF64}[])
+end
+
+# (iii) THE strong end-to-end check: a *full*-FCI multi-determinant trial is
+# the exact ground state, so the phaseless approximation is exact and AFQMC
+# must return the FCI energy to ~machine precision (tiny stochastic scatter
+# only, since every walker's overlap ratio is with the exact eigenstate).
+# This validates the entire multi-det pipeline (overlap, mixed Green's
+# function, mixed local energy, propagation, phaseless gate) at once. ---
+@testset "AFQMC with a full-FCI trial is exact" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    e_fci = ab_initio_fci_ground_state_energy(mi.h1e, mi.h2e, 2, 2; E_nuc=mi.E_nuc)
+    full_trial, mi_mo, _ = LatticeMC.build_casci_trial(mi, 2, 2)
+    Random.seed!(2)
+    result = LatticeMC.run_afqmc_ab_initio(mi_mo, full_trial, 2, 2; dtau=0.01, num_walkers=100,
+                                            num_steps=800, equilibration_steps=200)
+    @test isapprox(result.energy_mean, e_fci; atol=1e-6)
+end
+
+# (iv) the point of the feature: a truncated CASCI trial systematically
+# closes the equilibrium-H4 phaseless gap that neither UHF nor force bias
+# could (theory doc section 6-7). More determinants -> monotonically closer
+# to FCI, all physical (above FCI). Measured 8% (top-1) -> ~90% (top-10);
+# tolerances here are loose/robust, checking the *ordering*, not exact %. ---
+@testset "truncated CASCI trial systematically improves toward FCI" begin
+    mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+    e_fci = ab_initio_fci_ground_state_energy(mi.h1e, mi.h2e, 2, 2; E_nuc=mi.E_nuc)
+
+    t1, m1, _ = LatticeMC.build_casci_trial(mi, 2, 2; max_dets=1)
+    t10, m10, _ = LatticeMC.build_casci_trial(mi, 2, 2; max_dets=10)
+
+    Random.seed!(3)
+    r1 = LatticeMC.run_afqmc_ab_initio(m1, t1, 2, 2; dtau=0.01, num_walkers=200,
+                                        num_steps=1500, equilibration_steps=400)
+    Random.seed!(3)
+    r10 = LatticeMC.run_afqmc_ab_initio(m10, t10, 2, 2; dtau=0.01, num_walkers=200,
+                                         num_steps=1500, equilibration_steps=400)
+
+    # both physical (not below FCI, within stochastic error), and 10 dets
+    # substantially closer to FCI than 1.
+    @test r1.energy_mean > e_fci - 0.01
+    @test r10.energy_mean > e_fci - 0.01
+    @test abs(r10.energy_mean - e_fci) < abs(r1.energy_mean - e_fci) - 0.02
+end

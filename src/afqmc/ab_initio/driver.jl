@@ -18,13 +18,16 @@ Float64 for systems with a large total energy (e.g. all-electron N2/F2 at
 ~-100/-200 Ha, where the unshifted weights overflow within a few thousand
 steps). Pass a number to override, or `nothing` to disable.
 """
-function run_afqmc_ab_initio(mi::MolecularIntegrals, trial::AbInitioTrial, Nup::Int, Ndown::Int;
+function run_afqmc_ab_initio(mi::MolecularIntegrals, trial::AbstractAbInitioTrial, Nup::Int, Ndown::Int;
                               dtau::Float64=0.01, num_walkers::Int=100, num_steps::Int=2000,
                               equilibration_steps::Int=200, stabilize_every::Int=5, pop_control_every::Int=10,
                               cholesky_threshold::Float64=1e-8, force_bias::Bool=false,
                               energy_shift::Union{Real,Nothing}=nothing)
-    size(trial.phi_up, 2) == Nup || throw(ArgumentError("trial.phi_up must have Nup columns"))
-    size(trial.phi_down, 2) == Ndown || throw(ArgumentError("trial.phi_down must have Ndown columns"))
+    ref_up, ref_down = reference_determinant(trial)
+    size(ref_up, 2) == Nup || throw(ArgumentError("trial up-determinant must have Nup columns"))
+    size(ref_down, 2) == Ndown || throw(ArgumentError("trial down-determinant must have Ndown columns"))
+    (force_bias && trial isa MultiDetTrial) &&
+        throw(ArgumentError("force_bias is only implemented for single-determinant trials"))
 
     Ls = cholesky_decompose_eri(mi.h2e; threshold=cholesky_threshold)
     h1e_mod = modified_one_body(mi.h1e, Ls)
@@ -32,7 +35,7 @@ function run_afqmc_ab_initio(mi::MolecularIntegrals, trial::AbInitioTrial, Nup::
     fbar = force_bias ? force_bias_shift(trial, Ls, dtau) : Float64[]
 
     if energy_shift === nothing
-        trial_walker = AbInitioWalker(copy(trial.phi_up), copy(trial.phi_down), 1.0)
+        trial_walker = AbInitioWalker(copy(ref_up), copy(ref_down), 1.0)
         energy_shift = real(local_energy_ab_initio(mi, trial_walker, trial))
     end
     shift_factor = exp(dtau * energy_shift)

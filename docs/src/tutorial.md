@@ -133,6 +133,29 @@ For small molecules, `test/ab_initio_fci_reference.jl`'s
 `ab_initio_fci_ground_state_energy` gives you an exact comparison point the
 same way `ed_reference.jl` does for Hubbard.
 
+### Closing the gap: a multi-determinant trial
+
+When a single determinant isn't enough (the equilibrium-H4 case above), the
+fix is a **multi-determinant trial** — a short CI expansion instead of one
+Slater determinant. `build_casci_trial` does RHF, transforms to the MO basis,
+solves a small CI, and keeps the top-`max_dets` determinants. It returns the
+MO-basis integrals you must run with (trial and integrals share a basis):
+
+```julia
+mi = LatticeMC.build_h_chain_sto3g(1.4; n_atoms=4)
+trial, mi_mo, e_ci = LatticeMC.build_casci_trial(mi, 2, 2; max_dets=10)
+result = LatticeMC.run_afqmc_ab_initio(mi_mo, trial, 2, 2)
+# more determinants -> systematically closer to FCI: on H4, top-1 ~8%,
+# top-5 ~73%, top-10 ~92%, full expansion exact.
+```
+
+`build_casci_trial`'s internal CI has the same size ceiling as exact
+diagonalization; for larger systems, build the trial from an external CASSCF
+expansion (e.g. a PySCF CI vector) via `multidet_from_ci`. This is the one
+knob that fixes the phaseless-approximation accuracy limit (see
+[`afqmc_ab_initio_theory.md`](afqmc_ab_initio_theory.md) section 8) — unlike
+symmetry-breaking or force bias, which address different, narrower problems.
+
 ## Where to go next
 
 - Modifying or reading `src/afqmc/`: start at
